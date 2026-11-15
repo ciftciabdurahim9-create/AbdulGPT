@@ -1,4 +1,5 @@
 const express = require("express");
+const crypto = require("crypto");
 const path = require("path");
 
 const app = express();
@@ -18,12 +19,27 @@ const MODLAR = {
 const LATEXSIZ = " Matematik yazarken LaTeX ve dolar işareti ($) kullanma. Formülleri düz metinle yaz, örneğin: sin(30°) = 1/2, x^2, √9, 3 × 4.";
 const HATIRLA = " Kullanıcı kendisi hakkında kalıcı bir bilgi paylaşırsa (adı, sınıfı, mesleği, ilgi alanı, tercihi gibi), cevabının EN SONUNA ayrı bir satırda [HATIRLA: kısa bilgi] ekle. Sıradan sorularda ekleme.";
 
+// Render'da SIFRE değişkeni tanımlarsan uygulama şifreli olur (boşsa herkese açık)
+const SIFRE = process.env.SIFRE || "";
+const ozet = x => crypto.createHash("sha256").update(String(x)).digest();
+const sifreTamam = g => !SIFRE || crypto.timingSafeEqual(ozet(g || ""), ozet(SIFRE));
+
 app.use(express.json({ limit: "6mb" }));
 app.use(express.static(path.join(__dirname, "public")));
 
 // Hız sınırı: IP başına dakikada 10 istek (ücretsiz kotayı korur)
 const sayac = new Map();
 setInterval(() => sayac.clear(), 60 * 1000);
+
+app.get("/api/durum", (req, res) => res.json({ sifreli: !!SIFRE }));
+app.post("/api/giris", (req, res) => {
+  const k = "g" + (req.headers["x-forwarded-for"] || req.ip);
+  const n = (sayac.get(k) || 0) + 1;
+  sayac.set(k, n);
+  if (n > 10) return res.status(429).json({ hata: "Çok fazla deneme, bir dakika bekle." });
+  if (sifreTamam(req.body && req.body.sifre)) return res.json({ ok: true });
+  res.status(401).json({ hata: "Şifre yanlış." });
+});
 
 const IMG_RE = /^data:(image\/(?:jpeg|png|webp));base64,([A-Za-z0-9+\/=]+)$/;
 const url = m => `https://generativelanguage.googleapis.com/v1beta/models/${m}:streamGenerateContent?alt=sse`;
@@ -35,6 +51,10 @@ app.post("/api/chat", async (req, res) => {
   const n = (sayac.get(ip) || 0) + 1;
   sayac.set(ip, n);
   if (n > 10) return res.status(429).json({ hata: "Çok hızlı gidiyorsun, bir dakika bekle." });
+
+  let gs = "";
+  try { gs = decodeURIComponent(req.headers["x-sifre"] || ""); } catch {}
+  if (!sifreTamam(gs)) return res.status(401).json({ hata: "Şifre gerekli veya yanlış." });
 
   const gelen = Array.isArray(req.body.messages) ? req.body.messages.slice(-20) : [];
   let ham = gelen
