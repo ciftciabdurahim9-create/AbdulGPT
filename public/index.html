@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>AbdulGPT</title>
 <style>
-:root{--bg:#0b1220;--panel:#111b2e;--cizgi:#22304a;--yazi:#e8eefb;--soluk:#8a9bb8;--a1:#6366f1;--a2:#06b6d4;--asistan:#18253b;color-scheme:dark}
+:root{--bg:#0b1220;--panel:#111b2e;--cizgi:#22304a;--yazi:#e8eefb;--soluk:#8a9bb8;--a1:#6366f1;--a2:#06b6d4;--asistan:#18253b;--kod:#0a101c;--hover:#1b2a44;color-scheme:dark}
 *{box-sizing:border-box;margin:0}
 html,body{height:100%}
 body{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;background:var(--bg);color:var(--yazi);display:flex;height:100dvh;overflow:hidden}
@@ -17,7 +17,7 @@ body{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;background:var(--
 #liste2{flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:4px}
 .it{display:flex;align-items:center;gap:6px;padding:9px 10px;border-radius:10px;cursor:pointer;color:var(--soluk);font-size:.92rem}
 .it span{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.it:hover,.it.on{background:#1b2a44;color:var(--yazi)}
+.it:hover,.it.on{background:var(--hover);color:var(--yazi)}
 .sil{font:inherit;background:none;border:0;color:var(--soluk);cursor:pointer;opacity:.6}
 .sil:hover{opacity:1;color:#ff7b86}
 #ana{flex:1;display:flex;flex-direction:column;min-width:0}
@@ -32,9 +32,9 @@ select,.ib{font:inherit;font-size:.95rem;color:var(--yazi);background:var(--pane
 .a{align-self:flex-start;background:var(--asistan);border-bottom-left-radius:4px}
 .a.hata{background:#4a2326}
 .foto{display:block;max-width:220px;max-height:220px;border-radius:10px;margin-bottom:6px}
-.m code{font-family:ui-monospace,Consolas,monospace;font-size:.9em;background:#0a101c;padding:1px 5px;border-radius:5px}
+.m code{font-family:ui-monospace,Consolas,monospace;font-size:.9em;background:var(--kod);padding:1px 5px;border-radius:5px}
 .kod{position:relative;margin:8px 0;white-space:normal}
-.kod pre{background:#0a101c;border-radius:10px;padding:14px 12px 12px;overflow-x:auto;white-space:pre}
+.kod pre{background:var(--kod);border-radius:10px;padding:14px 12px 12px;overflow-x:auto;white-space:pre}
 .kod pre code{background:none;padding:0}
 .kopya{position:absolute;top:6px;right:6px;font:inherit;font-size:.72rem;color:var(--soluk);background:var(--panel);border:1px solid var(--cizgi);border-radius:6px;padding:2px 8px;cursor:pointer}
 #onizle{display:flex;align-items:center;gap:10px;padding:8px 14px;border-top:1px solid var(--cizgi);background:var(--panel)}
@@ -60,8 +60,21 @@ dialog::backdrop{background:#000a}
 dialog h2{font-size:1.1rem;margin-bottom:6px}
 dialog p{color:var(--soluk);font-size:.85rem;margin-bottom:10px}
 dialog textarea{width:100%;margin-bottom:10px}
-.toast{position:fixed;left:50%;bottom:90px;transform:translateX(-50%);background:#1b2a44;border:1px solid var(--a2);padding:8px 14px;border-radius:999px;font-size:.88rem;z-index:20;max-width:90vw}
+.toast{position:fixed;left:50%;bottom:90px;transform:translateX(-50%);background:var(--hover);border:1px solid var(--a2);padding:8px 14px;border-radius:999px;font-size:.88rem;z-index:20;max-width:90vw}
 .katex-display{overflow-x:auto;overflow-y:hidden}
+:root[data-tema="acik"]{--bg:#f3f6fc;--panel:#ffffff;--cizgi:#d8e0ef;--yazi:#16202e;--soluk:#5b6b85;--asistan:#e7ecf7;--kod:#edf0f8;--hover:#e1e8f6;color-scheme:light}
+:root[data-tema="acik"] .a.hata{background:#ffd9dc}
+.hizli{display:flex;flex-wrap:wrap;gap:8px;align-self:flex-start;max-width:min(88%,640px)}
+.hz{font:inherit;font-size:.88rem;color:var(--yazi);background:var(--panel);border:1px solid var(--cizgi);border-radius:999px;padding:7px 12px;cursor:pointer}
+.hz:hover{border-color:var(--a2)}
+.eylem{display:flex;gap:8px;margin-top:8px;flex-wrap:wrap}
+.eylem button{font:inherit;font-size:.78rem;color:var(--soluk);background:none;border:1px solid var(--cizgi);border-radius:999px;padding:3px 10px;cursor:pointer}
+.eylem button:hover{color:var(--yazi)}
+.sat{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:12px}
+.sat label{font-size:.85rem;color:var(--soluk);display:flex;flex-direction:column;gap:4px}
+dialog h3{font-size:.95rem;margin-bottom:4px}
+dialog input{width:100%;font:inherit;color:var(--yazi);background:var(--bg);border:1px solid var(--cizgi);border-radius:12px;padding:10px 12px;margin-bottom:10px}
+#girishata{color:#ff7b86;font-size:.85rem;min-height:1.2em;margin-bottom:6px}
 </style>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
 <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
@@ -84,11 +97,9 @@ dialog textarea{width:100%;margin-bottom:10px}
       <option value="ozetleyici">Özetleyici</option>
       <option value="ders">Ders / Ödev</option>
     </select>
-    <button class="ib" id="ayarb" type="button" aria-label="Benim hakkımda" title="Benim hakkımda">⚙</button>
+    <button class="ib" id="ayarb" type="button" aria-label="Ayarlar" title="Ayarlar">⚙</button>
   </header>
   <div id="araclar">
-    <button class="ib" id="ara" type="button" title="İnternetten güncel bilgi arar">🌐 İnternet</button>
-    <button class="ib" id="derin" type="button" title="Daha güçlü model, daha yavaş">🧠 Derin düşün</button>
     <button class="ib" id="ses" type="button" title="Cevapları sesli oku">🔈 Sesli oku</button>
   </div>
   <div id="liste" aria-live="polite"></div>
@@ -101,8 +112,20 @@ dialog textarea{width:100%;margin-bottom:10px}
     <button id="b">Gönder</button>
   </form>
 </div>
+<dialog id="giris">
+  <h2>Şifre</h2>
+  <p>Bu uygulamaya girmek için şifre gerekli.</p>
+  <input type="password" id="sifre" placeholder="Şifre" autocomplete="current-password">
+  <div id="girishata"></div>
+  <button class="ib" id="girisb" type="button">Giriş</button>
+</dialog>
 <dialog id="ayar">
-  <h2>Benim hakkımda</h2>
+  <h2>Ayarlar</h2>
+  <div class="sat">
+    <label>Tema <select id="tema"><option value="koyu">Koyu</option><option value="acik">Açık</option><option value="oto">Cihaza göre</option></select></label>
+    <label>Yazı boyutu <select id="boyut"><option value="kucuk">Küçük</option><option value="normal">Normal</option><option value="buyuk">Büyük</option></select></label>
+  </div>
+  <h3>Benim hakkımda</h3>
   <p>Asistan bunları hatırlar ve yeni öğrendiklerini buraya kendisi ekler. Her satır bir bilgi. Bu yazılar tarayıcında saklanır ve her mesajla yapay zekaya gönderilir; şifre ya da gizli bilgi yazma.</p>
   <textarea id="profil" rows="8" placeholder="Adım Ali&#10;8. sınıfa gidiyorum&#10;Futbolu severim"></textarea>
   <button class="ib" id="ayarkapat" type="button">Kaydet ve kapat</button>
@@ -114,6 +137,14 @@ const LOGO = "🤖";       // Emoji ya da bir resim dosyası adı (örn. "logo.p
 // -------------------------------
 const $ = id => document.getElementById(id);
 const KEY = "abdulgpt_v2";
+let gor = { tema: "koyu", boyut: "normal" };
+try { gor = Object.assign(gor, JSON.parse(localStorage.getItem("abdulgpt_gorunum"))); } catch {}
+function gorunum(){
+  const acik = gor.tema === "acik" || (gor.tema === "oto" && matchMedia("(prefers-color-scheme: light)").matches);
+  document.documentElement.dataset.tema = acik ? "acik" : "koyu";
+  document.documentElement.style.fontSize = { kucuk: "14px", normal: "16px", buyuk: "19px" }[gor.boyut] || "16px";
+}
+gorunum();
 const liste = $("liste"), t = $("t"), b = $("b"), modSec = $("mod");
 let db = null, ac = null, yaziyor = false, bekleyen = null, sesli = false;
 
@@ -151,6 +182,27 @@ function ekle(metin, sinif, img, foto){
   }
   liste.appendChild(d); kaydir(); return d;
 }
+const HIZLI = {
+  genel: ["Bana ilginç bir bilgi ver", "Bugün için bir plan yap", "Kısa bir hikaye yaz", "Şunu basitçe açıkla:"],
+  kodlama: ["Basit bir HTML sayfası yaz", "Bu kodu açıkla:", "Şu hatayı çöz:"],
+  cevirmen: ["İngilizceye çevir:", "Türkçeye çevir:"],
+  ozetleyici: ["Şu metni özetle:", "Ana fikirleri çıkar:"],
+  ders: ["Bir matematik sorusu çöz:", "Konuyu basitçe anlat:", "Bana 5 test sorusu hazırla"]
+};
+function hizliCiz(mod){
+  const h = document.createElement("div"); h.className = "hizli";
+  h.innerHTML = (HIZLI[mod] || HIZLI.genel).map(x => `<button type="button" class="hz" data-q="${esc(x)}">${esc(x)}</button>`).join("");
+  liste.appendChild(h);
+}
+function eylemSil(){ liste.querySelectorAll(".eylem").forEach(e => e.remove()); }
+function eylemEkle(){
+  eylemSil();
+  const s = cur(), son = s.m[s.m.length - 1], bub = liste.lastElementChild;
+  if (!son || son.role !== "assistant" || !bub || !bub.classList.contains("a") || bub.classList.contains("hata")) return;
+  const d = document.createElement("div"); d.className = "eylem";
+  d.innerHTML = '<button type="button" data-e="kopya">📋 Kopyala</button><button type="button" data-e="yeniden">🔄 Yeniden üret</button>';
+  bub.appendChild(d);
+}
 function cizYan(){
   $("liste2").innerHTML = db.sohbetler.map(s =>
     `<div class="it ${s.id === db.aktif ? "on" : ""}" data-id="${s.id}"><span>${esc(s.baslik)}</span><button type="button" class="sil" data-sil="${s.id}" aria-label="Sohbeti sil">✕</button></div>`).join("");
@@ -158,9 +210,9 @@ function cizYan(){
 function cizHepsi(){
   const s = cur(); $("baslik").textContent = s.baslik; modSec.value = s.mod;
   liste.innerHTML = "";
-  if (!s.m.length) ekle("Merhaba! Ben " + AD + ". Bana yazabilir, 📎 ile resim ekleyebilir, 🎤 ile konuşabilirsin.", "a");
+  if (!s.m.length) { ekle("Merhaba! Ben " + AD + ". Bana yazabilir, 📎 ile resim ekleyebilir, 🎤 ile konuşabilirsin.", "a"); hizliCiz(s.mod); }
   s.m.forEach(m => ekle(m.content, m.role === "user" ? "k" : "a", null, m.foto));
-  cizYan(); $("yan").classList.remove("ac");
+  eylemEkle(); cizYan(); $("yan").classList.remove("ac");
 }
 cizHepsi();
 
@@ -178,7 +230,7 @@ $("liste2").addEventListener("click", e => {
 });
 $("yeni").addEventListener("click", () => { if (yaziyor) ac.abort(); yeniSohbet(); });
 $("menu").addEventListener("click", () => $("yan").classList.toggle("ac"));
-modSec.addEventListener("change", () => { cur().mod = modSec.value; kaydet(); });
+modSec.addEventListener("change", () => { cur().mod = modSec.value; kaydet(); if (!cur().m.length) cizHepsi(); });
 liste.addEventListener("click", e => {
   if (!e.target.classList.contains("kopya")) return;
   navigator.clipboard.writeText(e.target.parentElement.querySelector("code").textContent)
@@ -230,15 +282,6 @@ function mat(el){
   if (window.renderMathInElement && cur().mod === "ders")
     try { renderMathInElement(el, { delimiters: [{ left: "$$", right: "$$", display: true }, { left: "$", right: "$", display: false }], throwOnError: false }); } catch {}
 }
-let ayar = { ara: false, derin: false };
-try { ayar = Object.assign(ayar, JSON.parse(localStorage.getItem("abdulgpt_ayar"))); } catch {}
-["ara", "derin"].forEach(k => {
-  $(k).classList.toggle("on", !!ayar[k]);
-  $(k).addEventListener("click", () => {
-    ayar[k] = !ayar[k]; $(k).classList.toggle("on", ayar[k]);
-    try { localStorage.setItem("abdulgpt_ayar", JSON.stringify(ayar)); } catch {}
-  });
-});
 const profilGet = () => { try { return localStorage.getItem("abdulgpt_profil") || ""; } catch { return ""; } };
 const profilSet = v => { try { localStorage.setItem("abdulgpt_profil", v); } catch {} };
 function bildir(m){ const d = document.createElement("div"); d.className = "toast"; d.textContent = m; document.body.appendChild(d); setTimeout(() => d.remove(), 3500); }
@@ -248,22 +291,25 @@ function profilEkle(bilgiler){
   if (!yeni.length) return;
   profilSet(satir.slice(-25).join("\n")); bildir("Hatırladım: " + yeni.join(", "));
 }
-$("ayarb").addEventListener("click", () => { $("profil").value = profilGet(); $("ayar").showModal(); });
+$("ayarb").addEventListener("click", () => { $("profil").value = profilGet(); $("tema").value = gor.tema; $("boyut").value = gor.boyut; $("ayar").showModal(); });
 $("ayarkapat").addEventListener("click", () => { profilSet($("profil").value.trim()); $("ayar").close(); });
 addEventListener("load", () => { if (cur().mod === "ders") cizHepsi(); });
 function arayuz(acik){ yaziyor = acik; b.textContent = acik ? "Durdur" : "Gönder"; b.classList.toggle("dur", acik); }
 
-async function gonder(){
-  const metin = t.value.trim();
-  if (!metin && !bekleyen) return;
+async function gonder(yeniden = false){
   const s = cur();
-  if (!s.m.length) liste.innerHTML = "";
-  const img = bekleyen; bekleyen = null; $("onizle").hidden = true; $("dosya").value = "";
-  t.value = ""; t.style.height = "auto";
+  if (!yeniden) {
+    const metin = t.value.trim();
+    if (!metin && !bekleyen) return;
+    if (!s.m.length) liste.innerHTML = "";
+    const img = bekleyen; bekleyen = null; $("onizle").hidden = true; $("dosya").value = "";
+    t.value = ""; t.style.height = "auto";
+    s.m.push({ role: "user", content: metin, img: img || undefined, foto: img ? true : undefined });
+    if (s.baslik === "Yeni sohbet") { s.baslik = (metin || "Resim").slice(0, 32); $("baslik").textContent = s.baslik; }
+    ekle(metin, "k", img); cizYan();
+  }
+  eylemSil();
   if (window.speechSynthesis) speechSynthesis.cancel();
-  s.m.push({ role: "user", content: metin, img: img || undefined, foto: img ? true : undefined });
-  if (s.baslik === "Yeni sohbet") { s.baslik = (metin || "Resim").slice(0, 32); $("baslik").textContent = s.baslik; }
-  ekle(metin, "k", img); cizYan();
   const bub = ekle("…", "a");
   ac = new AbortController(); arayuz(true);
   let cevap = "";
@@ -273,8 +319,9 @@ async function gonder(){
       content: x.content || (x.img ? "Bu resmi anlat." : x.foto ? "(resim gönderildi)" : ""),
       image: i === s.m.length - 1 ? x.img : undefined
     }));
-    const r = await fetch("/api/chat", { method: "POST", headers: { "Content-Type": "application/json" }, signal: ac.signal,
-      body: JSON.stringify({ messages: govde, mod: s.mod, ara: ayar.ara, derin: ayar.derin, profil: profilGet().slice(0, 1200) }) });
+    const r = await fetch("/api/chat", { method: "POST", headers: { "Content-Type": "application/json", "x-sifre": encodeURIComponent(sifre) }, signal: ac.signal,
+      body: JSON.stringify({ messages: govde, mod: s.mod, profil: profilGet().slice(0, 1200) }) });
+    if (r.status === 401) { sifre = ""; try { localStorage.removeItem("abdulgpt_sifre"); } catch {} girisAc("Şifre gerekli."); }
     if (!r.ok) { const v = await r.json().catch(() => ({})); throw new Error(v.hata || "Bir hata oluştu"); }
     const rd = r.body.getReader(), dec = new TextDecoder(); let buf = "";
     while (true) {
@@ -290,7 +337,7 @@ async function gonder(){
       }
     }
   } catch (e) {
-    if (e.name !== "AbortError") { bub.classList.add("hata"); bub.textContent = e.message; if (!cevap) s.m.pop(); }
+    if (e.name !== "AbortError") { bub.classList.add("hata"); bub.textContent = e.message; if (!cevap && !yeniden) s.m.pop(); }
   }
   if (cevap) {
     const bul = [...cevap.matchAll(/\[HATIRLA:\s*([^\]]+)\]/g)].map(m => m[1].trim());
@@ -300,11 +347,55 @@ async function gonder(){
     if (sesli && window.speechSynthesis) oku(cevap);
   }
   else if (bub.textContent === "…") bub.remove();
-  kaydet(); arayuz(false); t.focus();
+  kaydet(); eylemEkle(); arayuz(false); t.focus();
 }
 $("f").addEventListener("submit", e => { e.preventDefault(); if (yaziyor) ac.abort(); else gonder(); });
 t.addEventListener("keydown", e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); if (!yaziyor) gonder(); } });
 t.addEventListener("input", () => { t.style.height = "auto"; t.style.height = Math.min(t.scrollHeight, 140) + "px"; });
+
+liste.addEventListener("click", e => {
+  const hz = e.target.closest(".hz");
+  if (hz) {
+    if (yaziyor) return;
+    const x = hz.dataset.q;
+    if (x.endsWith(":")) { t.value = x + " "; t.focus(); } else { t.value = x; gonder(); }
+    return;
+  }
+  const eb = e.target.closest("[data-e]");
+  if (!eb || yaziyor) return;
+  const s = cur(), son = s.m[s.m.length - 1];
+  if (!son || son.role !== "assistant") return;
+  if (eb.dataset.e === "kopya") {
+    navigator.clipboard.writeText(son.content).then(() => { eb.textContent = "✓ Kopyalandı"; setTimeout(() => eb.textContent = "📋 Kopyala", 1500); });
+  } else { s.m.pop(); liste.lastElementChild.remove(); gonder(true); }
+});
+function gorKaydet(){ try { localStorage.setItem("abdulgpt_gorunum", JSON.stringify(gor)); } catch {} gorunum(); }
+$("tema").addEventListener("change", () => { gor.tema = $("tema").value; gorKaydet(); });
+$("boyut").addEventListener("change", () => { gor.boyut = $("boyut").value; gorKaydet(); });
+
+// Şifre koruması (sunucuda SIFRE tanımlıysa devreye girer)
+let sifre = ""; try { sifre = localStorage.getItem("abdulgpt_sifre") || ""; } catch {}
+async function sifreDene(x){
+  try { const r = await fetch("/api/giris", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ sifre: x }) }); return r.ok; }
+  catch { return false; }
+}
+function girisAc(mesaj = ""){ $("girishata").textContent = mesaj; if (!$("giris").open) $("giris").showModal(); $("sifre").focus(); }
+async function girisKontrol(){
+  try {
+    const d = await (await fetch("/api/durum")).json();
+    if (!d.sifreli) return;
+    if (sifre && await sifreDene(sifre)) return;
+    girisAc();
+  } catch {}
+}
+$("giris").addEventListener("cancel", e => e.preventDefault());
+$("girisb").addEventListener("click", async () => {
+  const x = $("sifre").value;
+  if (await sifreDene(x)) { sifre = x; try { localStorage.setItem("abdulgpt_sifre", x); } catch {} $("sifre").value = ""; $("giris").close(); }
+  else $("girishata").textContent = "Şifre yanlış.";
+});
+$("sifre").addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); $("girisb").click(); } });
+girisKontrol();
 </script>
 </body>
 </html>
