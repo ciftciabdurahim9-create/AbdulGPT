@@ -13,7 +13,7 @@ const MODLAR = {
   ozetleyici: "Sen bir özetleme asistanısın. Verilen metni Türkçe, madde madde ve kısa özetle."
 };
 
-app.use(express.json({ limit: "100kb" }));
+app.use(express.json({ limit: "6mb" }));
 app.use(express.static(path.join(__dirname, "public")));
 
 // Hız sınırı: IP başına dakikada 10 istek (ücretsiz kotayı korur)
@@ -29,23 +29,36 @@ app.post("/api/chat", async (req, res) => {
   if (n > 10) return res.status(429).json({ hata: "Çok hızlı gidiyorsun, bir dakika bekle." });
 
   const gelen = Array.isArray(req.body.messages) ? req.body.messages.slice(-20) : [];
+  const IMG_RE = /^data:(image\/(?:jpeg|png|webp));base64,([A-Za-z0-9+\/=]+)$/;
   let ham = gelen
-    .filter(m => m && (m.role === "user" || m.role === "assistant") && typeof m.content === "string" && m.content.trim())
-    .map(m => ({ role: m.role, content: m.content.slice(0, 8000) }));
+    .filter(m => m && (m.role === "user" || m.role === "assistant") && typeof m.content === "string")
+    .map(m => {
+      const o = { role: m.role, content: m.content.slice(0, 8000) };
+      if (m.role === "user" && typeof m.image === "string" && m.image.length < 4000000) {
+        const g = IMG_RE.exec(m.image);
+        if (g) o.image = { mimeType: g[1], data: g[2] };
+      }
+      return o;
+    })
+    .filter(m => m.content.trim() || m.image);
   // Geçmişi düzelt: başı "user" olsun, art arda aynı rol varsa birleştir
   while (ham.length && ham[0].role !== "user") ham.shift();
   const messages = [];
   for (const m of ham) {
     const son = messages[messages.length - 1];
-    if (son && son.role === m.role) son.content += "\n" + m.content;
-    else messages.push({ role: m.role, content: m.content });
+    if (son && son.role === m.role) { son.content += "\n" + m.content; if (m.image) son.image = m.image; }
+    else messages.push({ ...m });
   }
   if (!messages.length || messages[messages.length - 1].role !== "user")
     return res.status(400).json({ hata: "Geçersiz mesaj." });
 
   const body = {
     systemInstruction: { parts: [{ text: MODLAR[req.body.mod] || MODLAR.genel }] },
-    contents: messages.map(m => ({ role: m.role === "assistant" ? "model" : "user", parts: [{ text: m.content }] })),
+    contents: messages.map(m => {
+      const parts = [{ text: m.content.trim() || "Bu resmi anlat." }];
+      if (m.image) parts.push({ inlineData: m.image });
+      return { role: m.role === "assistant" ? "model" : "user", parts };
+    }),
     generationConfig: { maxOutputTokens: 2000 }
   };
 
