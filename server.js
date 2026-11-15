@@ -3,9 +3,8 @@ const path = require("path");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-const API_KEY = process.env.ANTHROPIC_API_KEY;
-const MODEL = process.env.MODEL || "claude-sonnet-5-5";
-const WEB_SEARCH = process.env.WEB_SEARCH === "1"; // Render'da WEB_SEARCH=1 yazarsan internette arama yapabilir
+const API_KEY = process.env.GEMINI_API_KEY;
+const MODEL = process.env.MODEL || "gemini-flash-latest";
 
 const MODLAR = {
   genel: "Sen yardımsever, samimi bir Türkçe yapay zeka asistanısın. Kısa ve anlaşılır cevap ver.",
@@ -17,17 +16,17 @@ const MODLAR = {
 app.use(express.json({ limit: "100kb" }));
 app.use(express.static(path.join(__dirname, "public")));
 
-// Hız sınırı: IP başına dakikada 15 istek (maliyeti korur)
+// Hız sınırı: IP başına dakikada 10 istek (ücretsiz kotayı korur)
 const sayac = new Map();
 setInterval(() => sayac.clear(), 60 * 1000);
 
 app.post("/api/chat", async (req, res) => {
-  if (!API_KEY) return res.status(500).json({ hata: "Sunucuda ANTHROPIC_API_KEY tanımlı değil." });
+  if (!API_KEY) return res.status(500).json({ hata: "Sunucuda GEMINI_API_KEY tanımlı değil." });
 
   const ip = req.headers["x-forwarded-for"] || req.ip;
   const n = (sayac.get(ip) || 0) + 1;
   sayac.set(ip, n);
-  if (n > 15) return res.status(429).json({ hata: "Çok hızlı gidiyorsun, bir dakika bekle." });
+  if (n > 10) return res.status(429).json({ hata: "Çok hızlı gidiyorsun, bir dakika bekle." });
 
   const gelen = Array.isArray(req.body.messages) ? req.body.messages.slice(-20) : [];
   const messages = gelen
@@ -36,23 +35,29 @@ app.post("/api/chat", async (req, res) => {
   if (!messages.length || messages[0].role !== "user" || messages[messages.length - 1].role !== "user")
     return res.status(400).json({ hata: "Geçersiz mesaj." });
 
-  const system = MODLAR[req.body.mod] || MODLAR.genel;
-  const body = { model: MODEL, max_tokens: 2000, system, messages, stream: true };
-  if (WEB_SEARCH) body.tools = [{ type: "web_search_20250305", name: "web_search", max_uses: 3 }];
+  const body = {
+    systemInstruction: { parts: [{ text: MODLAR[req.body.mod] || MODLAR.genel }] },
+    contents: messages.map(m => ({ role: m.role === "assistant" ? "model" : "user", parts: [{ text: m.content }] })),
+    generationConfig: { maxOutputTokens: 2000 }
+  };
 
   const ac = new AbortController();
   res.on("close", () => { if (!res.writableEnded) ac.abort(); });
 
   try {
-    const r = await fetch("https://api.anthropic.com/v1/messages", {
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:streamGenerateContent?alt=sse`;
+    const r = await fetch(url, {
       method: "POST",
       signal: ac.signal,
-      headers: { "content-type": "application/json", "x-api-key": API_KEY, "anthropic-version": "2023-06-01" },
+      headers: { "content-type": "application/json", "x-goog-api-key": API_KEY },
       body: JSON.stringify(body)
     });
     if (!r.ok) {
       const d = await r.json().catch(() => ({}));
-      return res.status(502).json({ hata: d.error?.message || "API hatası" });
+      const msg = r.status === 429
+        ? "Ücretsiz kota doldu, biraz bekleyip tekrar dene."
+        : (d.error?.message || "API hatası (" + r.status + ")");
+      return res.status(502).json({ hata: msg });
     }
 
     res.set({ "Content-Type": "text/event-stream", "Cache-Control": "no-cache", Connection: "keep-alive" });
@@ -65,6 +70,7 @@ app.post("/api/chat", async (req, res) => {
       const { done, value } = await reader.read();
       if (done) break;
       buf += dec.decode(value, { stream: true });
+      buf = buf.replace(/\r\n/g, "\n");
       let i;
       while ((i = buf.indexOf("\n\n")) >= 0) {
         const blok = buf.slice(0, i);
@@ -73,8 +79,10 @@ app.post("/api/chat", async (req, res) => {
         if (!satir) continue;
         let ev;
         try { ev = JSON.parse(satir.slice(6)); } catch { continue; }
-        if (ev.type === "content_block_delta" && ev.delta?.type === "text_delta") send({ t: ev.delta.text });
-        else if (ev.type === "error") send({ hata: ev.error?.message || "API hatası" });
+        if (ev.promptFeedback?.blockReason) { send({ hata: "Bu istek güvenlik nedeniyle engellendi." }); continue; }
+        const parcalar = ev.candidates?.[0]?.content?.parts || [];
+        const metin = parcalar.filter(p => p.text && !p.thought).map(p => p.text).join("");
+        if (metin) send({ t: metin });
       }
     }
     send({ bitti: true });
