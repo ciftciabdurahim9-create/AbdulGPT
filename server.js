@@ -5,16 +5,18 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 const API_KEY = process.env.GEMINI_API_KEY;
 const MODEL = process.env.MODEL || "gemini-flash-latest";
+const MODEL_GUCLU = process.env.MODEL_GUCLU || "gemini-pro-latest"; // "Derin düşün" için
 
+const ORTAK = " Doğru, net ve dürüst ol; emin olmadığın bir şeyi uydurma, bilmiyorsan söyle. Soru belirsizse varsayımını belirt.";
 const MODLAR = {
   genel: "Sen yardımsever, samimi bir Türkçe yapay zeka asistanısın. Kısa ve anlaşılır cevap ver.",
   kodlama: "Sen uzman bir yazılım geliştiricisin. Türkçe açıkla, kodu her zaman markdown kod bloğu içinde ver, kısa ve doğru ol.",
   cevirmen: "Sen profesyonel bir çevirmensin. Kullanıcı Türkçe yazarsa İngilizceye, başka dilde yazarsa Türkçeye çevir. Sadece çeviriyi ver.",
-  ozetleyici: "Sen bir özetleme asistanısın. Verilen metni Türkçe, madde madde ve kısa özetle."
+  ozetleyici: "Sen bir özetleme asistanısın. Verilen metni Türkçe, madde madde ve kısa özetle.",
+  ders: "Sen sabırlı bir Türkçe öğretmensin (ilkokuldan üniversiteye ders ve ödevler). Soruyu önce kısaca anla, sonra adım adım çöz; adımları numarala ve nedenini açıkla. Sonda net sonucu ver ve cevabı kontrol et. Matematik ve fen formüllerini LaTeX ile yaz: satır içi $...$, ayrı satırda $$...$$."
 };
-
-// Formüller düz yazıyla gelsin (LaTeX ekranda bozuk görünür)
-const KURAL = " Matematik yazarken LaTeX ve dolar işareti ($) kullanma. Formülleri düz metinle yaz, örneğin: sin(30°) = 1/2, x^2, √9, 3 × 4.";
+const LATEXSIZ = " Matematik yazarken LaTeX ve dolar işareti ($) kullanma. Formülleri düz metinle yaz, örneğin: sin(30°) = 1/2, x^2, √9, 3 × 4.";
+const HATIRLA = " Kullanıcı kendisi hakkında kalıcı bir bilgi paylaşırsa (adı, sınıfı, mesleği, ilgi alanı, tercihi gibi), cevabının EN SONUNA ayrı bir satırda [HATIRLA: kısa bilgi] ekle. Sıradan sorularda ekleme.";
 
 app.use(express.json({ limit: "6mb" }));
 app.use(express.static(path.join(__dirname, "public")));
@@ -22,6 +24,9 @@ app.use(express.static(path.join(__dirname, "public")));
 // Hız sınırı: IP başına dakikada 10 istek (ücretsiz kotayı korur)
 const sayac = new Map();
 setInterval(() => sayac.clear(), 60 * 1000);
+
+const IMG_RE = /^data:(image\/(?:jpeg|png|webp));base64,([A-Za-z0-9+\/=]+)$/;
+const url = m => `https://generativelanguage.googleapis.com/v1beta/models/${m}:streamGenerateContent?alt=sse`;
 
 app.post("/api/chat", async (req, res) => {
   if (!API_KEY) return res.status(500).json({ hata: "Sunucuda GEMINI_API_KEY tanımlı değil." });
@@ -32,7 +37,6 @@ app.post("/api/chat", async (req, res) => {
   if (n > 10) return res.status(429).json({ hata: "Çok hızlı gidiyorsun, bir dakika bekle." });
 
   const gelen = Array.isArray(req.body.messages) ? req.body.messages.slice(-20) : [];
-  const IMG_RE = /^data:(image\/(?:jpeg|png|webp));base64,([A-Za-z0-9+\/=]+)$/;
   let ham = gelen
     .filter(m => m && (m.role === "user" || m.role === "assistant") && typeof m.content === "string")
     .map(m => {
@@ -44,7 +48,6 @@ app.post("/api/chat", async (req, res) => {
       return o;
     })
     .filter(m => m.content.trim() || m.image);
-  // Geçmişi düzelt: başı "user" olsun, art arda aynı rol varsa birleştir
   while (ham.length && ham[0].role !== "user") ham.shift();
   const messages = [];
   for (const m of ham) {
@@ -55,37 +58,47 @@ app.post("/api/chat", async (req, res) => {
   if (!messages.length || messages[messages.length - 1].role !== "user")
     return res.status(400).json({ hata: "Geçersiz mesaj." });
 
+  const mod = req.body.mod;
+  const profil = typeof req.body.profil === "string" ? req.body.profil.slice(0, 1200).replace(/\s*\n\s*/g, "; ") : "";
+  const sistem = (MODLAR[mod] || MODLAR.genel) + ORTAK + (mod === "ders" ? "" : LATEXSIZ) + HATIRLA +
+    (profil ? " Kullanıcı hakkında bildiklerin (işine yaradığında doğal biçimde kullan, her seferinde söyleme): " + profil : "");
+
   const body = {
-    systemInstruction: { parts: [{ text: (MODLAR[req.body.mod] || MODLAR.genel) + KURAL }] },
+    systemInstruction: { parts: [{ text: sistem }] },
     contents: messages.map(m => {
       const parts = [{ text: m.content.trim() || "Bu resmi anlat." }];
       if (m.image) parts.push({ inlineData: m.image });
       return { role: m.role === "assistant" ? "model" : "user", parts };
     }),
-    generationConfig: { maxOutputTokens: 2000 }
+    generationConfig: { maxOutputTokens: 4000 }
   };
+  if (req.body.ara === true) body.tools = [{ google_search: {} }]; // internetten arama
 
   const ac = new AbortController();
   res.on("close", () => { if (!res.writableEnded) ac.abort(); });
 
   try {
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:streamGenerateContent?alt=sse`;
-    const r = await fetch(url, {
-      method: "POST",
-      signal: ac.signal,
-      headers: { "content-type": "application/json", "x-goog-api-key": API_KEY },
-      body: JSON.stringify(body)
-    });
+    const modeller = req.body.derin === true ? [MODEL_GUCLU, MODEL] : [MODEL];
+    let r = null, dusuldu = false;
+    for (let i = 0; i < modeller.length; i++) {
+      r = await fetch(url(modeller[i]), {
+        method: "POST", signal: ac.signal,
+        headers: { "content-type": "application/json", "x-goog-api-key": API_KEY },
+        body: JSON.stringify(body)
+      });
+      if (r.ok) { dusuldu = i > 0; break; }
+      if (![403, 404, 429, 503].includes(r.status)) break; // güçlü model yoksa/doluysa normale düş
+    }
     if (!r.ok) {
       const d = await r.json().catch(() => ({}));
-      const msg = r.status === 429
-        ? "Ücretsiz kota doldu, biraz bekleyip tekrar dene."
+      const msg = r.status === 429 ? "Ücretsiz kota doldu, biraz bekleyip tekrar dene."
         : (d.error?.message || "API hatası (" + r.status + ")");
       return res.status(502).json({ hata: msg });
     }
 
     res.set({ "Content-Type": "text/event-stream", "Cache-Control": "no-cache", Connection: "keep-alive" });
     const send = o => res.write("data: " + JSON.stringify(o) + "\n\n");
+    if (dusuldu) send({ t: "(Derin model şu an kullanılamıyor, normal modelle cevapladım.)\n\n" });
 
     const reader = r.body.getReader();
     const dec = new TextDecoder();
