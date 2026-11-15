@@ -13,6 +13,9 @@ const MODLAR = {
   ozetleyici: "Sen bir özetleme asistanısın. Verilen metni Türkçe, madde madde ve kısa özetle."
 };
 
+// Formüller düz yazıyla gelsin (LaTeX ekranda bozuk görünür)
+const KURAL = " Matematik yazarken LaTeX ve dolar işareti ($) kullanma. Formülleri düz metinle yaz, örneğin: sin(30°) = 1/2, x^2, √9, 3 × 4.";
+
 app.use(express.json({ limit: "6mb" }));
 app.use(express.static(path.join(__dirname, "public")));
 
@@ -53,7 +56,7 @@ app.post("/api/chat", async (req, res) => {
     return res.status(400).json({ hata: "Geçersiz mesaj." });
 
   const body = {
-    systemInstruction: { parts: [{ text: MODLAR[req.body.mod] || MODLAR.genel }] },
+    systemInstruction: { parts: [{ text: (MODLAR[req.body.mod] || MODLAR.genel) + KURAL }] },
     contents: messages.map(m => {
       const parts = [{ text: m.content.trim() || "Bu resmi anlat." }];
       if (m.image) parts.push({ inlineData: m.image });
