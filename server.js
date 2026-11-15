@@ -91,8 +91,9 @@ app.post("/api/chat", async (req, res) => {
     }
     if (!r.ok) {
       const d = await r.json().catch(() => ({}));
-      const msg = r.status === 429 ? "Ücretsiz kota doldu, biraz bekleyip tekrar dene."
-        : (d.error?.message || "API hatası (" + r.status + ")");
+      const detay = (d.error?.message || "").slice(0, 300);
+      const msg = r.status === 429 ? "Ücretsiz kota doldu, biraz bekleyip tekrar dene. (Google: " + detay + ")"
+        : (detay || "API hatası (" + r.status + ")");
       return res.status(502).json({ hata: msg });
     }
 
