@@ -29,10 +29,18 @@ app.post("/api/chat", async (req, res) => {
   if (n > 10) return res.status(429).json({ hata: "Çok hızlı gidiyorsun, bir dakika bekle." });
 
   const gelen = Array.isArray(req.body.messages) ? req.body.messages.slice(-20) : [];
-  const messages = gelen
-    .filter(m => (m.role === "user" || m.role === "assistant") && typeof m.content === "string" && m.content)
+  let ham = gelen
+    .filter(m => m && (m.role === "user" || m.role === "assistant") && typeof m.content === "string" && m.content.trim())
     .map(m => ({ role: m.role, content: m.content.slice(0, 8000) }));
-  if (!messages.length || messages[0].role !== "user" || messages[messages.length - 1].role !== "user")
+  // Geçmişi düzelt: başı "user" olsun, art arda aynı rol varsa birleştir
+  while (ham.length && ham[0].role !== "user") ham.shift();
+  const messages = [];
+  for (const m of ham) {
+    const son = messages[messages.length - 1];
+    if (son && son.role === m.role) son.content += "\n" + m.content;
+    else messages.push({ role: m.role, content: m.content });
+  }
+  if (!messages.length || messages[messages.length - 1].role !== "user")
     return res.status(400).json({ hata: "Geçersiz mesaj." });
 
   const body = {
