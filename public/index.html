@@ -53,7 +53,19 @@ textarea:focus,.ib:focus-visible,select:focus-visible{outline:2px solid var(--a1
   #menu{display:block}
 }
 @media (prefers-reduced-motion:reduce){#yan{transition:none}#mik.on{animation:none}#liste{scroll-behavior:auto}}
+#araclar{display:flex;gap:8px;padding:8px 14px;border-bottom:1px solid var(--cizgi);flex-wrap:wrap}
+#araclar .ib{font-size:.82rem;padding:5px 10px;border-radius:999px}
+dialog{margin:auto;width:min(460px,92vw);background:var(--panel);color:var(--yazi);border:1px solid var(--cizgi);border-radius:16px;padding:18px}
+dialog::backdrop{background:#000a}
+dialog h2{font-size:1.1rem;margin-bottom:6px}
+dialog p{color:var(--soluk);font-size:.85rem;margin-bottom:10px}
+dialog textarea{width:100%;margin-bottom:10px}
+.toast{position:fixed;left:50%;bottom:90px;transform:translateX(-50%);background:#1b2a44;border:1px solid var(--a2);padding:8px 14px;border-radius:999px;font-size:.88rem;z-index:20;max-width:90vw}
+.katex-display{overflow-x:auto;overflow-y:hidden}
 </style>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
 </head>
 <body>
 <aside id="yan">
@@ -70,9 +82,15 @@ textarea:focus,.ib:focus-visible,select:focus-visible{outline:2px solid var(--a1
       <option value="kodlama">Kodlama</option>
       <option value="cevirmen">Çevirmen</option>
       <option value="ozetleyici">Özetleyici</option>
+      <option value="ders">Ders / Ödev</option>
     </select>
-    <button class="ib" id="ses" type="button" title="Cevapları sesli oku" aria-label="Cevapları sesli oku">🔈</button>
+    <button class="ib" id="ayarb" type="button" aria-label="Benim hakkımda" title="Benim hakkımda">⚙</button>
   </header>
+  <div id="araclar">
+    <button class="ib" id="ara" type="button" title="İnternetten güncel bilgi arar">🌐 İnternet</button>
+    <button class="ib" id="derin" type="button" title="Daha güçlü model, daha yavaş">🧠 Derin düşün</button>
+    <button class="ib" id="ses" type="button" title="Cevapları sesli oku">🔈 Sesli oku</button>
+  </div>
   <div id="liste" aria-live="polite"></div>
   <div id="onizle" hidden><img id="onimg" alt="Seçilen resim"><button class="ib" id="onkaldir" type="button">Kaldır</button></div>
   <form id="f">
@@ -83,6 +101,12 @@ textarea:focus,.ib:focus-visible,select:focus-visible{outline:2px solid var(--a1
     <button id="b">Gönder</button>
   </form>
 </div>
+<dialog id="ayar">
+  <h2>Benim hakkımda</h2>
+  <p>Asistan bunları hatırlar ve yeni öğrendiklerini buraya kendisi ekler. Her satır bir bilgi. Bu yazılar tarayıcında saklanır ve her mesajla yapay zekaya gönderilir; şifre ya da gizli bilgi yazma.</p>
+  <textarea id="profil" rows="8" placeholder="Adım Ali&#10;8. sınıfa gidiyorum&#10;Futbolu severim"></textarea>
+  <button class="ib" id="ayarkapat" type="button">Kaydet ve kapat</button>
+</dialog>
 <script>
 // ---- Kendine göre değiştir ----
 const AD = "AbdulGPT";   // Uygulama adın
@@ -119,7 +143,7 @@ function md(s){
 const kaydir = () => { liste.scrollTop = liste.scrollHeight; };
 function ekle(metin, sinif, img, foto){
   const d = document.createElement("div"); d.className = "m " + sinif;
-  if (sinif === "a") d.innerHTML = md(metin);
+  if (sinif === "a") { d.innerHTML = md(temizle(metin)); mat(d); }
   else {
     if (img) { const i = document.createElement("img"); i.src = img; i.className = "foto"; i.alt = "Gönderilen resim"; d.appendChild(i); }
     else if (foto) { const p = document.createElement("div"); p.textContent = "📷 (resim)"; d.appendChild(p); }
@@ -193,7 +217,7 @@ else {
 // Cevapları sesli okuma
 if (!window.speechSynthesis) $("ses").hidden = true;
 $("ses").addEventListener("click", () => {
-  sesli = !sesli; $("ses").classList.toggle("on", sesli); $("ses").textContent = sesli ? "🔊" : "🔈";
+  sesli = !sesli; $("ses").classList.toggle("on", sesli);
   if (!sesli) speechSynthesis.cancel();
 });
 function oku(metin){
@@ -201,6 +225,32 @@ function oku(metin){
   u.lang = "tr-TR"; speechSynthesis.speak(u);
 }
 
+function temizle(s){ return s.replace(/\[HATIRLA:[^\]]*\]/g, "").replace(/\[HATIRLA:[^\]]*$/, "").replace(/\s+$/, ""); }
+function mat(el){
+  if (window.renderMathInElement && cur().mod === "ders")
+    try { renderMathInElement(el, { delimiters: [{ left: "$$", right: "$$", display: true }, { left: "$", right: "$", display: false }], throwOnError: false }); } catch {}
+}
+let ayar = { ara: false, derin: false };
+try { ayar = Object.assign(ayar, JSON.parse(localStorage.getItem("abdulgpt_ayar"))); } catch {}
+["ara", "derin"].forEach(k => {
+  $(k).classList.toggle("on", !!ayar[k]);
+  $(k).addEventListener("click", () => {
+    ayar[k] = !ayar[k]; $(k).classList.toggle("on", ayar[k]);
+    try { localStorage.setItem("abdulgpt_ayar", JSON.stringify(ayar)); } catch {}
+  });
+});
+const profilGet = () => { try { return localStorage.getItem("abdulgpt_profil") || ""; } catch { return ""; } };
+const profilSet = v => { try { localStorage.setItem("abdulgpt_profil", v); } catch {} };
+function bildir(m){ const d = document.createElement("div"); d.className = "toast"; d.textContent = m; document.body.appendChild(d); setTimeout(() => d.remove(), 3500); }
+function profilEkle(bilgiler){
+  const satir = profilGet().split("\n").map(x => x.trim()).filter(Boolean), yeni = [];
+  bilgiler.forEach(x => { x = x.slice(0, 120); if (!satir.some(y => y.toLowerCase() === x.toLowerCase())) { satir.push(x); yeni.push(x); } });
+  if (!yeni.length) return;
+  profilSet(satir.slice(-25).join("\n")); bildir("Hatırladım: " + yeni.join(", "));
+}
+$("ayarb").addEventListener("click", () => { $("profil").value = profilGet(); $("ayar").showModal(); });
+$("ayarkapat").addEventListener("click", () => { profilSet($("profil").value.trim()); $("ayar").close(); });
+addEventListener("load", () => { if (cur().mod === "ders") cizHepsi(); });
 function arayuz(acik){ yaziyor = acik; b.textContent = acik ? "Durdur" : "Gönder"; b.classList.toggle("dur", acik); }
 
 async function gonder(){
@@ -224,7 +274,7 @@ async function gonder(){
       image: i === s.m.length - 1 ? x.img : undefined
     }));
     const r = await fetch("/api/chat", { method: "POST", headers: { "Content-Type": "application/json" }, signal: ac.signal,
-      body: JSON.stringify({ messages: govde, mod: s.mod }) });
+      body: JSON.stringify({ messages: govde, mod: s.mod, ara: ayar.ara, derin: ayar.derin, profil: profilGet().slice(0, 1200) }) });
     if (!r.ok) { const v = await r.json().catch(() => ({})); throw new Error(v.hata || "Bir hata oluştu"); }
     const rd = r.body.getReader(), dec = new TextDecoder(); let buf = "";
     while (true) {
@@ -236,13 +286,19 @@ async function gonder(){
         if (!blok.startsWith("data: ")) continue;
         const o = JSON.parse(blok.slice(6));
         if (o.hata) throw new Error(o.hata);
-        if (o.t) { cevap += o.t; bub.innerHTML = md(cevap); kaydir(); }
+        if (o.t) { cevap += o.t; bub.innerHTML = md(temizle(cevap)); kaydir(); }
       }
     }
   } catch (e) {
     if (e.name !== "AbortError") { bub.classList.add("hata"); bub.textContent = e.message; if (!cevap) s.m.pop(); }
   }
-  if (cevap) { s.m.push({ role: "assistant", content: cevap }); if (sesli && window.speechSynthesis) oku(cevap); }
+  if (cevap) {
+    const bul = [...cevap.matchAll(/\[HATIRLA:\s*([^\]]+)\]/g)].map(m => m[1].trim());
+    cevap = temizle(cevap); bub.innerHTML = md(cevap); mat(bub);
+    if (bul.length) profilEkle(bul);
+    s.m.push({ role: "assistant", content: cevap });
+    if (sesli && window.speechSynthesis) oku(cevap);
+  }
   else if (bub.textContent === "…") bub.remove();
   kaydet(); arayuz(false); t.focus();
 }
