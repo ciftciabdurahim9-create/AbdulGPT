@@ -5,10 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>AbdulGPT</title>
 <style>
-:root{--bg:#0b1220;--panel:#111b2e;--cizgi:#22304a;--yazi:#e8eefb;--soluk:#8a9bb8;--a1:#6366f1;--a2:#06b6d4;--asistan:#18253b;--kod:#0a101c;--hover:#1b2a44;color-scheme:dark}
+:root{--bg:#0b1220;--panel:#111b2e;--cizgi:#22304a;--yazi:#e8eefb;--soluk:#8a9bb8;--a1:#6366f1;--a2:#06b6d4;--asistan:#18253b;--kod:#0a101c;--hover:#1b2a44;--g1:rgba(99,102,241,.28);--g2:rgba(6,182,212,.2);--g3:rgba(236,72,153,.12);color-scheme:dark}
 *{box-sizing:border-box;margin:0}
 html,body{height:100%}
-body{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;background:var(--bg);color:var(--yazi);display:flex;height:100dvh;overflow:hidden}
+body{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;background:radial-gradient(55% 45% at 12% 8%,var(--g1),transparent 70%),radial-gradient(50% 40% at 92% 15%,var(--g2),transparent 70%),radial-gradient(60% 50% at 70% 100%,var(--g3),transparent 70%),var(--bg);color:var(--yazi);display:flex;height:100dvh;overflow:hidden}
 #yan{width:268px;background:var(--panel);border-right:1px solid var(--cizgi);display:flex;flex-direction:column;padding:14px;gap:12px;flex-shrink:0}
 .marka{display:flex;align-items:center;gap:10px;font-weight:800;font-size:1.15rem}
 .marka .lg{width:36px;height:36px;border-radius:11px;background:linear-gradient(135deg,var(--a1),var(--a2));display:grid;place-items:center;font-size:1.25rem;overflow:hidden}
@@ -62,7 +62,7 @@ dialog p{color:var(--soluk);font-size:.85rem;margin-bottom:10px}
 dialog textarea{width:100%;margin-bottom:10px}
 .toast{position:fixed;left:50%;bottom:90px;transform:translateX(-50%);background:var(--hover);border:1px solid var(--a2);padding:8px 14px;border-radius:999px;font-size:.88rem;z-index:20;max-width:90vw}
 .katex-display{overflow-x:auto;overflow-y:hidden}
-:root[data-tema="acik"]{--bg:#f3f6fc;--panel:#ffffff;--cizgi:#d8e0ef;--yazi:#16202e;--soluk:#5b6b85;--asistan:#e7ecf7;--kod:#edf0f8;--hover:#e1e8f6;color-scheme:light}
+:root[data-tema="acik"]{--bg:#f3f6fc;--panel:#ffffff;--cizgi:#d8e0ef;--yazi:#16202e;--soluk:#5b6b85;--asistan:#e7ecf7;--kod:#edf0f8;--hover:#e1e8f6;--g1:rgba(99,102,241,.16);--g2:rgba(6,182,212,.14);--g3:rgba(236,72,153,.08);color-scheme:light}
 :root[data-tema="acik"] .a.hata{background:#ffd9dc}
 .hizli{display:flex;flex-wrap:wrap;gap:8px;align-self:flex-start;max-width:min(88%,640px)}
 .hz{font:inherit;font-size:.88rem;color:var(--yazi);background:var(--panel);border:1px solid var(--cizgi);border-radius:999px;padding:7px 12px;cursor:pointer}
@@ -75,6 +75,28 @@ dialog textarea{width:100%;margin-bottom:10px}
 dialog h3{font-size:.95rem;margin-bottom:4px}
 dialog input{width:100%;font:inherit;color:var(--yazi);background:var(--bg);border:1px solid var(--cizgi);border-radius:12px;padding:10px 12px;margin-bottom:10px}
 #girishata{color:#ff7b86;font-size:.85rem;min-height:1.2em;margin-bottom:6px}
+header{background:color-mix(in srgb,var(--panel) 70%,transparent);backdrop-filter:blur(10px)}
+.m{animation:gir .25s ease both;box-shadow:0 2px 10px #0003}
+@keyframes gir{from{opacity:0;transform:translateY(6px)}}
+.karsi{margin:auto;text-align:center;width:min(100%,680px);padding:10px 0}
+.karsi .logo{width:84px;height:84px;margin:0 auto 14px;border-radius:26px;background:linear-gradient(135deg,var(--a1),var(--a2));display:grid;place-items:center;font-size:2.6rem;box-shadow:0 10px 40px var(--g1);animation:yuz 4s ease-in-out infinite;overflow:hidden}
+@keyframes yuz{50%{transform:translateY(-8px)}}
+.karsi h2{font-size:clamp(1.6rem,5vw,2.3rem);line-height:1.15}
+.karsi h2 b{background:linear-gradient(90deg,var(--a1),var(--a2),#ec4899);-webkit-background-clip:text;background-clip:text;color:transparent}
+.karsi p{color:var(--soluk);margin:8px 0 22px}
+.kartlar{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;text-align:left}
+.kart{font:inherit;color:var(--yazi);background:color-mix(in srgb,var(--panel) 80%,transparent);border:1px solid var(--cizgi);border-radius:16px;padding:14px;cursor:pointer;transition:transform .15s,border-color .15s}
+.kart:hover{transform:translateY(-3px);border-color:var(--a2)}
+.kart i{font-style:normal;font-size:1.5rem;display:block;margin-bottom:6px}
+.kart b{display:block;font-size:.95rem}
+.kart span{color:var(--soluk);font-size:.8rem}
+#hesap{border-top:1px solid var(--cizgi);padding-top:12px;display:flex;flex-direction:column;gap:8px;font-size:.82rem;color:var(--soluk)}
+#hesap[hidden]{display:none}
+#hesap .kul{display:flex;align-items:center;gap:8px;color:var(--yazi)}
+#hesap .kul img{width:30px;height:30px;border-radius:50%}
+#hesap .kul span{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.gb{font:inherit;font-weight:700;color:var(--yazi);background:var(--panel);border:1px solid var(--cizgi);border-radius:12px;padding:9px;cursor:pointer}
+@media (prefers-reduced-motion:reduce){.karsi .logo,.m{animation:none}.kart{transition:none}}
 </style>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
 <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
@@ -85,6 +107,7 @@ dialog input{width:100%;font:inherit;color:var(--yazi);background:var(--bg);bord
   <div class="marka"><span class="lg" id="logo"></span><span id="ad"></span></div>
   <button class="yenib" id="yeni" type="button">+ Yeni sohbet</button>
   <div id="liste2"></div>
+  <div id="hesap" hidden></div>
 </aside>
 <div id="ana">
   <header>
@@ -97,6 +120,7 @@ dialog input{width:100%;font:inherit;color:var(--yazi);background:var(--bg);bord
       <option value="ozetleyici">Özetleyici</option>
       <option value="ders">Ders / Ödev</option>
     </select>
+    <button class="ib" id="gece" type="button" aria-label="Gece / gündüz" title="Gece / gündüz">🌙</button>
     <button class="ib" id="ayarb" type="button" aria-label="Ayarlar" title="Ayarlar">⚙</button>
   </header>
   <div id="araclar">
@@ -143,6 +167,7 @@ function gorunum(){
   const acik = gor.tema === "acik" || (gor.tema === "oto" && matchMedia("(prefers-color-scheme: light)").matches);
   document.documentElement.dataset.tema = acik ? "acik" : "koyu";
   document.documentElement.style.fontSize = { kucuk: "14px", normal: "16px", buyuk: "19px" }[gor.boyut] || "16px";
+  const g = $("gece"); if (g) g.textContent = acik ? "🌙" : "☀️";
 }
 gorunum();
 const liste = $("liste"), t = $("t"), b = $("b"), modSec = $("mod");
@@ -155,9 +180,11 @@ else $("logo").textContent = LOGO;
 try { db = JSON.parse(localStorage.getItem(KEY)); } catch {}
 if (!db || !Array.isArray(db.sohbetler) || !db.sohbetler.length) { db = { aktif: null, sohbetler: [] }; yeniSohbet(false); }
 const cur = () => db.sohbetler.find(s => s.id === db.aktif) || db.sohbetler[0];
-function kaydet(){ try { localStorage.setItem(KEY, JSON.stringify(db, (k, v) => k === "img" ? undefined : v)); } catch {} }
+function kaydet(){ try { localStorage.setItem(KEY, JSON.stringify(db, (k, v) => k === "img" ? undefined : v)); } catch {}
+  if (window.Hesap) window.Hesap.kaydet(db);
+}
 function yeniSohbet(ciz = true){
-  const s = { id: Date.now().toString(36), baslik: "Yeni sohbet", mod: "genel", m: [] };
+  const s = { id: Date.now().toString(36), baslik: "Yeni sohbet", mod: "genel", m: [], t: Date.now() };
   db.sohbetler.unshift(s); db.aktif = s.id;
   if (db.sohbetler.length > 30) db.sohbetler.pop();
   kaydet(); if (ciz) cizHepsi();
@@ -194,6 +221,24 @@ function hizliCiz(mod){
   h.innerHTML = (HIZLI[mod] || HIZLI.genel).map(x => `<button type="button" class="hz" data-q="${esc(x)}">${esc(x)}</button>`).join("");
   liste.appendChild(h);
 }
+const KARTLAR = [
+  { i: "📚", b: "Ödev yardımcısı", a: "Adım adım çözsün", mod: "ders", q: "Şu soruyu çöz:" },
+  { i: "📷", b: "Resimden sor", a: "Fotoğraf yükle", foto: true },
+  { i: "💻", b: "Kod yaz", a: "Kod üret, hata bul", mod: "kodlama", q: "Şunu kodla:" },
+  { i: "🌍", b: "Çeviri", a: "Türkçe ↔ İngilizce", mod: "cevirmen", q: "Çevir:" },
+  { i: "📝", b: "Özetle", a: "Uzun metni kısalt", mod: "ozetleyici", q: "Şu metni özetle:" },
+  { i: "💡", b: "Fikir ver", a: "İlginç bir şey öğren", mod: "genel", q: "Bana ilginç bir bilgi ver" }
+];
+function selam(){ const h = new Date().getHours(); return h < 6 ? "İyi geceler" : h < 12 ? "Günaydın" : h < 18 ? "İyi günler" : "İyi akşamlar"; }
+function karsilaCiz(){
+  const ad = (window.UYG && window.UYG.ad) ? " " + window.UYG.ad.split(" ")[0] : "";
+  const resim = /\.(png|jpe?g|svg|webp)$/i.test(LOGO);
+  const d = document.createElement("div"); d.className = "karsi";
+  d.innerHTML = '<div class="logo">' + (resim ? '<img src="' + esc(LOGO) + '" alt="" style="width:100%;height:100%;object-fit:cover">' : esc(LOGO)) + '</div>' +
+    '<h2>' + selam() + '<b>' + esc(ad) + '</b>!<br>Bugün ne yapalım?</h2><p>' + esc(AD) + ' ile soru sor, resim yükle ya da sesle konuş.</p><div class="kartlar">' +
+    KARTLAR.map((k, n) => '<button type="button" class="kart" data-k="' + n + '"><i>' + k.i + '</i><b>' + k.b + '</b><span>' + k.a + '</span></button>').join("") + '</div>';
+  liste.appendChild(d);
+}
 function eylemSil(){ liste.querySelectorAll(".eylem").forEach(e => e.remove()); }
 function eylemEkle(){
   eylemSil();
@@ -210,7 +255,7 @@ function cizYan(){
 function cizHepsi(){
   const s = cur(); $("baslik").textContent = s.baslik; modSec.value = s.mod;
   liste.innerHTML = "";
-  if (!s.m.length) { ekle("Merhaba! Ben " + AD + ". Bana yazabilir, 📎 ile resim ekleyebilir, 🎤 ile konuşabilirsin.", "a"); hizliCiz(s.mod); }
+  if (!s.m.length) karsilaCiz();
   s.m.forEach(m => ekle(m.content, m.role === "user" ? "k" : "a", null, m.foto));
   eylemEkle(); cizYan(); $("yan").classList.remove("ac");
 }
@@ -220,6 +265,7 @@ $("liste2").addEventListener("click", e => {
   const sil = e.target.dataset.sil;
   if (sil) {
     if (yaziyor) ac.abort();
+    if (window.Hesap) window.Hesap.sil(sil);
     db.sohbetler = db.sohbetler.filter(s => s.id !== sil);
     if (!db.sohbetler.length) yeniSohbet(false);
     if (db.aktif === sil) db.aktif = db.sohbetler[0].id;
@@ -347,13 +393,23 @@ async function gonder(yeniden = false){
     if (sesli && window.speechSynthesis) oku(cevap);
   }
   else if (bub.textContent === "…") bub.remove();
-  kaydet(); eylemEkle(); arayuz(false); t.focus();
+  s.t = Date.now(); kaydet(); eylemEkle(); arayuz(false); t.focus();
 }
 $("f").addEventListener("submit", e => { e.preventDefault(); if (yaziyor) ac.abort(); else gonder(); });
 t.addEventListener("keydown", e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); if (!yaziyor) gonder(); } });
 t.addEventListener("input", () => { t.style.height = "auto"; t.style.height = Math.min(t.scrollHeight, 140) + "px"; });
 
 liste.addEventListener("click", e => {
+  const kt = e.target.closest(".kart");
+  if (kt) {
+    if (yaziyor) return;
+    const k = KARTLAR[+kt.dataset.k];
+    if (k.foto) { $("dosya").click(); return; }
+    cur().mod = k.mod; modSec.value = k.mod; kaydet();
+    t.value = k.q.endsWith(":") ? k.q + " " : k.q;
+    if (k.q.endsWith(":")) t.focus(); else gonder();
+    return;
+  }
   const hz = e.target.closest(".hz");
   if (hz) {
     if (yaziyor) return;
@@ -395,7 +451,26 @@ $("girisb").addEventListener("click", async () => {
   else $("girishata").textContent = "Şifre yanlış.";
 });
 $("sifre").addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); $("girisb").click(); } });
+$("gece").addEventListener("click", () => { gor.tema = document.documentElement.dataset.tema === "acik" ? "koyu" : "acik"; gorKaydet(); });
+// Hesap eklentisi (hesap.js) bu nesne üzerinden sohbetleri okur/yazar
+window.UYG = {
+  ad: "",
+  al: () => db,
+  ciz: () => cizHepsi(),
+  birlestir(bulut){
+    bulut = bulut.filter(c => c && c.id && Array.isArray(c.m));
+    const bulutta = new Set(bulut.map(c => c.id));
+    const yerel = db.sohbetler.filter(c => !bulutta.has(c.id) && c.m.length);
+    db.sohbetler = [...bulut, ...yerel].sort((a, b) => (b.t || 0) - (a.t || 0)).slice(0, 30);
+    if (!db.sohbetler.length) yeniSohbet(false);
+    if (!db.sohbetler.some(c => c.id === db.aktif)) db.aktif = db.sohbetler[0].id;
+    kaydet(); cizHepsi();
+  },
+  sifirla(){ db = { aktif: null, sohbetler: [] }; yeniSohbet(false); cizHepsi(); }
+};
 girisKontrol();
 </script>
+<script src="firebase-config.js"></script>
+<script type="module" src="hesap.js"></script>
 </body>
 </html>
