@@ -1,5 +1,11 @@
 {
   "appId": "com.abdulgpt.app",
   "appName": "AbdulGPT",
-  "webDir": "www"
+  "webDir": "www",
+  "server": {
+    "allowNavigation": [
+      "abdulgpt.com.tr",
+      "*.abdulgpt.com.tr"
+    ]
+  }
 }
