@@ -232,6 +232,14 @@ body{background:radial-gradient(45% 40% at 12% 0%,rgba(20,184,166,.34),transpare
 form:focus-within{box-shadow:0 12px 40px #0005,0 0 0 4px rgba(20,184,166,.25)}
 .hz:hover{border-color:var(--a2);color:var(--a2)}
 @media (prefers-reduced-motion:reduce){.karsi .logo,.karsi .logo::after,.karsi h2 b{animation:none}}
+
+/* ===== Görsel oluşturma ===== */
+.uretilen{display:block;width:min(100%,512px);border-radius:18px;box-shadow:0 12px 40px rgba(20,184,166,.25);margin-bottom:10px}
+.gbek{width:min(100%,360px);aspect-ratio:1;border-radius:18px;display:grid;place-items:center;color:var(--soluk);font-size:.9rem;background:linear-gradient(110deg,var(--hover) 30%,color-mix(in srgb,var(--a1) 28%,var(--hover)) 50%,var(--hover) 70%);background-size:220% 100%;animation:sim 1.4s linear infinite}
+@keyframes sim{to{background-position:-220% 0}}
+.indir{display:inline-block;font-size:.8rem;color:var(--soluk);border:1px solid var(--cizgi);border-radius:999px;padding:4px 12px;text-decoration:none}
+.indir:hover{color:var(--yazi);border-color:var(--a1)}
+@media (prefers-reduced-motion:reduce){.gbek{animation:none}}
 </style>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
 <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
@@ -254,6 +262,7 @@ form:focus-within{box-shadow:0 12px 40px #0005,0 0 0 4px rgba(20,184,166,.25)}
       <option value="cevirmen">Çevirmen</option>
       <option value="ozetleyici">Özetleyici</option>
       <option value="ders">Ders / Ödev</option>
+      <option value="gorsel">Görsel oluştur</option>
     </select>
     <button class="ib" id="gece" type="button" aria-label="Gece / gündüz" title="Gece / gündüz">🌙</button>
     <button class="ib" id="ayarb" type="button" aria-label="Ayarlar" title="Ayarlar">⚙</button>
@@ -312,6 +321,7 @@ const IC = {
   code:'<path d="m16 18 6-6-6-6M8 6l-6 6 6 6"/>',
   lang:'<path d="M5 8h8M9 4v4M7 8c0 4 3 7 6 8M11 8c0 3-2 6-6 8M13 20l4-9 4 9M14.5 17h5"/>',
   file:'<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8zM14 2v6h6M8 13h8M8 17h6"/>',
+  sparkles:'<path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z"/><path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z"/>',
   bulb:'<path d="M9 18h6M10 22h4M12 2a7 7 0 0 0-4 12.7V17h8v-2.3A7 7 0 0 0 12 2Z"/>'
 };
 const ik = n => '<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + IC[n] + '</svg>';
@@ -382,8 +392,9 @@ const KARTLAR = [
   { i: "code",  b: "Kod yaz",         a: "Kod üret, hata bul",   mod: "kodlama",    q: "Şunu kodla:" },
   { i: "lang",  b: "Çeviri",          a: "Türkçe ↔ İngilizce",   mod: "cevirmen",   q: "Çevir:" },
   { i: "file",  b: "Özetle",          a: "Uzun metni kısalt",    mod: "ozetleyici", q: "Şu metni özetle:" },
-  { i: "bulb",  b: "Fikir ver",       a: "İlginç bir şey öğren", mod: "genel",      q: "Bana ilginç bir bilgi ver" }
+  { i: "sparkles", b: "Görsel oluştur", a: "Hayal et, çizsin",    mod: "gorsel",     q: "Şunu çiz:" }
 ];
+const yer = () => { t.placeholder = cur().mod === "gorsel" ? "Ne çizmemi istersin? Örn: gün batımında bir şehir, dijital sanat" : "Mesajını yaz..."; };
 function selam(){ const h = new Date().getHours(); return h < 6 ? "İyi geceler" : h < 12 ? "Günaydın" : h < 18 ? "İyi günler" : "İyi akşamlar"; }
 function karsilaCiz(){
   const ad = (window.UYG && window.UYG.ad) ? " " + window.UYG.ad.split(" ")[0] : "";
@@ -408,7 +419,7 @@ function cizYan(){
     `<div class="it ${s.id === db.aktif ? "on" : ""}" data-id="${s.id}"><span>${esc(s.baslik)}</span><button type="button" class="sil" data-sil="${s.id}" aria-label="Sohbeti sil">✕</button></div>`).join("");
 }
 function cizHepsi(){
-  const s = cur(); $("baslik").textContent = s.baslik; modSec.value = s.mod;
+  const s = cur(); $("baslik").textContent = s.baslik; modSec.value = s.mod; yer();
   liste.innerHTML = "";
   if (!s.m.length) karsilaCiz();
   s.m.forEach(m => ekle(m.content, m.role === "user" ? "k" : "a", null, m.foto));
@@ -431,7 +442,7 @@ $("liste2").addEventListener("click", e => {
 });
 $("yeni").addEventListener("click", () => { if (yaziyor) ac.abort(); yeniSohbet(); });
 $("menu").addEventListener("click", () => $("yan").classList.toggle("ac"));
-modSec.addEventListener("change", () => { cur().mod = modSec.value; kaydet(); if (!cur().m.length) cizHepsi(); });
+modSec.addEventListener("change", () => { cur().mod = modSec.value; kaydet(); yer(); if (!cur().m.length) cizHepsi(); });
 liste.addEventListener("click", e => {
   if (!e.target.classList.contains("kopya")) return;
   navigator.clipboard.writeText(e.target.parentElement.querySelector("code").textContent)
@@ -497,6 +508,25 @@ $("ayarkapat").addEventListener("click", () => { profilSet($("profil").value.tri
 addEventListener("load", () => { if (cur().mod === "ders") cizHepsi(); });
 function arayuz(acik){ yaziyor = acik; b.innerHTML = ik(acik ? "stop" : "send"); b.setAttribute("aria-label", acik ? "Durdur" : "Gönder"); b.classList.toggle("dur", acik); }
 
+async function gorselUret(s, bub){
+  const istem = (s.m[s.m.length - 1].content || "").trim();
+  bub.innerHTML = '<div class="gbek">Görsel hazırlanıyor…</div>';
+  try {
+    const r = await fetch("/api/gorsel", { method: "POST", headers: { "Content-Type": "application/json", "x-sifre": encodeURIComponent(sifre) }, signal: ac.signal, body: JSON.stringify({ istem }) });
+    if (r.status === 401) { sifre = ""; try { localStorage.removeItem("abdulgpt_sifre"); } catch {} girisAc("Şifre gerekli."); }
+    const v = await r.json().catch(() => ({}));
+    if (!r.ok || !v.gorsel) throw new Error(v.hata || "Görsel oluşturulamadı");
+    bub.textContent = "";
+    const im = new Image(); im.src = v.gorsel; im.alt = istem; im.className = "uretilen";
+    const a = document.createElement("a"); a.href = v.gorsel; a.download = "abdulgpt-gorsel." + (v.gorsel.startsWith("data:image/png") ? "png" : "jpg"); a.className = "indir"; a.textContent = "İndir";
+    bub.append(im, a);
+    s.m.push({ role: "assistant", content: "(Görsel oluşturuldu: " + istem.slice(0, 80) + ")" });
+  } catch (e) {
+    if (e.name === "AbortError") bub.remove();
+    else { bub.classList.add("hata"); bub.textContent = e.message; s.m.pop(); }
+  }
+  s.t = Date.now(); kaydet(); arayuz(false); t.focus();
+}
 async function gonder(yeniden = false){
   const s = cur();
   if (!yeniden) {
@@ -514,6 +544,7 @@ async function gonder(yeniden = false){
   const bub = ekle("…", "a");
   ac = new AbortController(); arayuz(true);
   let cevap = "";
+  if (s.mod === "gorsel") return gorselUret(s, bub);
   try {
     const govde = s.m.map((x, i) => ({
       role: x.role,
@@ -560,7 +591,7 @@ liste.addEventListener("click", e => {
     if (yaziyor) return;
     const k = KARTLAR[+kt.dataset.k];
     if (k.foto) { $("dosya").click(); return; }
-    cur().mod = k.mod; modSec.value = k.mod; kaydet();
+    cur().mod = k.mod; modSec.value = k.mod; kaydet(); yer();
     t.value = k.q.endsWith(":") ? k.q + " " : k.q;
     if (k.q.endsWith(":")) t.focus(); else gonder();
     return;
