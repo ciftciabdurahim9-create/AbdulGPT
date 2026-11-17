@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">AbdulGPT</string>
+    <string name="title_activity_main">AbdulGPT</string>
+    <string name="package_name">com.abdulgpt.app</string>
+    <string name="custom_url_scheme">com.abdulgpt.app</string>
+</resources>
