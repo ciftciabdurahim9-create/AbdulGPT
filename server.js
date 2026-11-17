@@ -7,6 +7,11 @@ const PORT = process.env.PORT || 3000;
 const API_KEY = process.env.GEMINI_API_KEY;
 const MODEL = process.env.MODEL || "gemini-flash-latest";
 const MODEL_GUCLU = process.env.MODEL_GUCLU || "gemini-pro-latest"; // "Derin düşün" için
+// Ücretsiz görsel oluşturma: Cloudflare Workers AI (FLUX.1 schnell). Ücretsiz hesap yeter, kart gerekmez.
+const CF_HESAP = process.env.CLOUDFLARE_ACCOUNT_ID || "";
+const CF_TOKEN = process.env.CLOUDFLARE_API_TOKEN || "";
+const CF_MODEL = process.env.CF_GORSEL_MODEL || "@cf/black-forest-labs/flux-1-schnell";
+const GORSEL_GUNLUK = +process.env.GORSEL_GUNLUK || 150; // Günlük toplam limit (ücretsiz kota yaklaşık 230 görsel/gün)
 
 const ORTAK = " Doğru, net ve dürüst ol; emin olmadığın bir şeyi uydurma, bilmiyorsan söyle. Soru belirsizse varsayımını belirt.";
 const MODLAR = {
@@ -149,6 +154,80 @@ app.post("/api/chat", async (req, res) => {
     if (res.headersSent) { res.end(); }
     else if (e.name !== "AbortError") res.status(500).json({ hata: "Sunucu hatası: " + e.message });
   }
+});
+
+// ---- Görsel oluşturma (Cloudflare Workers AI, ücretsiz) ----
+const gorselSayac = { gun: "", adet: 0 }; // Bellekte tutulur; Render yeniden başlayınca sıfırlanır
+
+// Türkçe isteği İngilizce, ayrıntılı bir görsel istemine çevirir (FLUX İngilizcede çok daha iyi). Uygunsuz isteklerde REFUSE döner.
+async function gorselIstemi(istem, signal) {
+  try {
+    const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`, {
+      method: "POST", signal,
+      headers: { "content-type": "application/json", "x-goog-api-key": API_KEY },
+      body: JSON.stringify({
+        systemInstruction: { parts: [{ text: "You write prompts for an image generator. Translate the user's request into one vivid English image prompt (max 60 words), adding helpful visual detail (style, lighting, composition) without changing the meaning. Output only the prompt. If the request is sexual, graphically violent, hateful, or shows a real person in a harmful way, output exactly REFUSE." }] },
+        contents: [{ role: "user", parts: [{ text: istem }] }],
+        generationConfig: { maxOutputTokens: 1000 }
+      })
+    });
+    const v = await r.json().catch(() => ({}));
+    const m = (v.candidates?.[0]?.content?.parts || []).filter(p => p.text && !p.thought).map(p => p.text).join("").trim();
+    return m || istem;
+  } catch (e) { if (e.name === "AbortError") throw e; return istem; }
+}
+
+app.post("/api/gorsel", async (req, res) => {
+  if (!CF_HESAP || !CF_TOKEN) return res.status(500).json({ hata: "Sunucuda CLOUDFLARE_ACCOUNT_ID ve CLOUDFLARE_API_TOKEN tanımlı değil." });
+
+  let gs = "";
+  try { gs = decodeURIComponent(req.headers["x-sifre"] || ""); } catch {}
+  if (!sifreTamam(gs)) return res.status(401).json({ hata: "Şifre gerekli veya yanlış." });
+
+  // IP başına dakikada en fazla 4 görsel
+  const k = "r" + (req.headers["x-forwarded-for"] || req.ip);
+  const n = (sayac.get(k) || 0) + 1;
+  sayac.set(k, n);
+  if (n > 4) return res.status(429).json({ hata: "Çok hızlı gidiyorsun, bir dakika bekle." });
+
+  const istem = req.body && req.body.istem;
+  if (!istem || typeof istem !== "string" || !istem.trim() || istem.length > 800)
+    return res.status(400).json({ hata: "İstem boş ya da çok uzun (en fazla 800 karakter)." });
+
+  const bugun = new Date().toISOString().slice(0, 10);
+  if (gorselSayac.gun !== bugun) { gorselSayac.gun = bugun; gorselSayac.adet = 0; }
+  if (gorselSayac.adet >= GORSEL_GUNLUK)
+    return res.status(429).json({ hata: "Bugünlük görsel limiti doldu, yarın tekrar dene." });
+
+  const ac = new AbortController();
+  const zaman = setTimeout(() => ac.abort(), 60000);
+  res.on("close", () => { if (!res.writableEnded) ac.abort(); });
+
+  try {
+    const ing = await gorselIstemi(istem.trim(), ac.signal);
+    if (/^REFUSE\b/i.test(ing)) return res.status(422).json({ hata: "Bu istek güvenlik kuralları nedeniyle reddedildi." });
+
+    const r = await fetch(`https://api.cloudflare.com/client/v4/accounts/${CF_HESAP}/ai/run/${CF_MODEL}`, {
+      method: "POST", signal: ac.signal,
+      headers: { "Authorization": "Bearer " + CF_TOKEN, "content-type": "application/json" },
+      body: JSON.stringify({ prompt: ing.slice(0, 1500), steps: 6 })
+    });
+    const v = await r.json().catch(() => ({}));
+    const b64 = v.result && v.result.image;
+    if (!r.ok || v.success === false || !b64) {
+      const detay = (v.errors?.[0]?.message || "").slice(0, 200);
+      const msg = r.status === 429 ? "Günlük ücretsiz görsel kotası doldu, yarın tekrar dene."
+        : /nsfw|flag|safety/i.test(detay) ? "Bu istek güvenlik kuralları nedeniyle reddedildi."
+        : (detay || "Görsel oluşturulamadı (" + r.status + ")");
+      return res.status(502).json({ hata: msg });
+    }
+    gorselSayac.adet++;
+    res.json({ gorsel: "data:" + (b64.startsWith("iVBOR") ? "image/png" : "image/jpeg") + ";base64," + b64 });
+  } catch (e) {
+    if (res.headersSent) return;
+    if (e.name === "AbortError") res.status(504).json({ hata: "Görsel çok uzun sürdü, tekrar dene." });
+    else res.status(500).json({ hata: "Görsel servisine ulaşılamadı: " + e.message });
+  } finally { clearTimeout(zaman); }
 });
 
 app.listen(PORT, () => console.log("Çalışıyor: " + PORT));
