@@ -11,7 +11,9 @@ const MODEL_GUCLU = process.env.MODEL_GUCLU || "gemini-pro-latest"; // "Derin d�
 const CF_HESAP = process.env.CLOUDFLARE_ACCOUNT_ID || "";
 const CF_TOKEN = process.env.CLOUDFLARE_API_TOKEN || "";
 const CF_MODEL = process.env.CF_GORSEL_MODEL || "@cf/black-forest-labs/flux-1-schnell";
-const GORSEL_GUNLUK = +process.env.GORSEL_GUNLUK || 150; // Günlük toplam limit (ücretsiz kota yaklaşık 230 görsel/gün)
+const CF_DUZEN_MODEL = process.env.CF_DUZEN_MODEL || "@cf/black-forest-labs/flux-2-klein-4b"; // Görsel düzenleme
+// Günlük limit "puan" olarak sayılır: yeni görsel 1 puan, düzenleme 3 puan (ücretsiz Cloudflare kotasının altında kalacak şekilde)
+const GORSEL_GUNLUK = +process.env.GORSEL_GUNLUK || 200;
 
 const ORTAK = " Doğru, net ve dürüst ol; emin olmadığın bir şeyi uydurma, bilmiyorsan söyle. Soru belirsizse varsayımını belirt.";
 const MODLAR = {
@@ -160,21 +162,25 @@ app.post("/api/chat", async (req, res) => {
 const gorselSayac = { gun: "", adet: 0 }; // Bellekte tutulur; Render yeniden başlayınca sıfırlanır
 
 // Türkçe isteği İngilizce, ayrıntılı bir görsel istemine çevirir (FLUX İngilizcede çok daha iyi). Uygunsuz isteklerde REFUSE döner.
-async function gorselIstemi(istem, signal) {
+async function gorselIstemi(istem, signal, resim) {
+  const SISTEM_YENI = "You write prompts for an image generator. Translate the user's request into one vivid English image prompt (max 60 words), adding helpful visual detail (style, lighting, composition) without changing the meaning. Output only the prompt. If the request is sexual, graphically violent, hateful, or shows a real person in a harmful way, output exactly REFUSE.";
+  const SISTEM_DUZEN = "You write instructions for an image editing model. The user gives an edit request for the attached image. Translate it into one clear English instruction (max 40 words) that describes only the change, and end with: Keep everything else unchanged. Output only the instruction. Output exactly REFUSE if the request or the image involves sexual content, graphic violence, hate, or if the edit could embarrass, sexualize, impersonate or harm a real, identifiable person (for example editing a photo of a real person's face or body in a demeaning way).";
   try {
+    const parts = [{ text: istem }];
+    if (resim) parts.push({ inlineData: resim });
     const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`, {
       method: "POST", signal,
       headers: { "content-type": "application/json", "x-goog-api-key": API_KEY },
       body: JSON.stringify({
-        systemInstruction: { parts: [{ text: "You write prompts for an image generator. Translate the user's request into one vivid English image prompt (max 60 words), adding helpful visual detail (style, lighting, composition) without changing the meaning. Output only the prompt. If the request is sexual, graphically violent, hateful, or shows a real person in a harmful way, output exactly REFUSE." }] },
-        contents: [{ role: "user", parts: [{ text: istem }] }],
+        systemInstruction: { parts: [{ text: resim ? SISTEM_DUZEN : SISTEM_YENI }] },
+        contents: [{ role: "user", parts }],
         generationConfig: { maxOutputTokens: 1000 }
       })
     });
     const v = await r.json().catch(() => ({}));
     const m = (v.candidates?.[0]?.content?.parts || []).filter(p => p.text && !p.thought).map(p => p.text).join("").trim();
-    return m || istem;
-  } catch (e) { if (e.name === "AbortError") throw e; return istem; }
+    return m || (resim ? "REFUSE" : istem); // düzenlemede çeviri/denetim alınamazsa güvenli tarafta kal
+  } catch (e) { if (e.name === "AbortError") throw e; return resim ? "REFUSE" : istem; }
 }
 
 app.post("/api/gorsel", async (req, res) => {
@@ -194,9 +200,19 @@ app.post("/api/gorsel", async (req, res) => {
   if (!istem || typeof istem !== "string" || !istem.trim() || istem.length > 800)
     return res.status(400).json({ hata: "İstem boş ya da çok uzun (en fazla 800 karakter)." });
 
+  // İsteğe bağlı kaynak görsel (düzenleme modu)
+  let resim = null;
+  const kaynak = req.body.kaynak;
+  if (kaynak !== undefined && kaynak !== null) {
+    const g = typeof kaynak === "string" && kaynak.length < 1500000 ? IMG_RE.exec(kaynak) : null;
+    if (!g) return res.status(400).json({ hata: "Düzenlenecek görsel geçersiz." });
+    resim = { mimeType: g[1], data: g[2] };
+  }
+  const agirlik = resim ? 3 : 1;
+
   const bugun = new Date().toISOString().slice(0, 10);
   if (gorselSayac.gun !== bugun) { gorselSayac.gun = bugun; gorselSayac.adet = 0; }
-  if (gorselSayac.adet >= GORSEL_GUNLUK)
+  if (gorselSayac.adet + agirlik > GORSEL_GUNLUK)
     return res.status(429).json({ hata: "Bugünlük görsel limiti doldu, yarın tekrar dene." });
 
   const ac = new AbortController();
@@ -204,14 +220,32 @@ app.post("/api/gorsel", async (req, res) => {
   res.on("close", () => { if (!res.writableEnded) ac.abort(); });
 
   try {
-    const ing = await gorselIstemi(istem.trim(), ac.signal);
+    const ing = await gorselIstemi(istem.trim(), ac.signal, resim);
     if (/^REFUSE\b/i.test(ing)) return res.status(422).json({ hata: "Bu istek güvenlik kuralları nedeniyle reddedildi." });
 
-    const r = await fetch(`https://api.cloudflare.com/client/v4/accounts/${CF_HESAP}/ai/run/${CF_MODEL}`, {
-      method: "POST", signal: ac.signal,
-      headers: { "Authorization": "Bearer " + CF_TOKEN, "content-type": "application/json" },
-      body: JSON.stringify({ prompt: ing.slice(0, 1500), steps: 6 })
-    });
+    let r;
+    const cfUrl = m => `https://api.cloudflare.com/client/v4/accounts/${CF_HESAP}/ai/run/${m}`;
+    if (resim) {
+      // Çıktı boyutu kaynak görselin oranına göre (64'ün katları, en fazla 1024)
+      const en = +req.body.en, boy = +req.body.boy;
+      let w = 1024, h = 1024;
+      if (en > 0 && boy > 0) {
+        const o = 1024 / Math.max(en, boy), kenet = x => Math.min(1024, Math.max(256, Math.round(x / 64) * 64));
+        w = kenet(en * o); h = kenet(boy * o);
+      }
+      const form = new FormData();
+      form.append("prompt", ing.slice(0, 1500));
+      form.append("input_image_0", new Blob([Buffer.from(resim.data, "base64")], { type: resim.mimeType }), "kaynak.jpg");
+      form.append("width", String(w));
+      form.append("height", String(h));
+      r = await fetch(cfUrl(CF_DUZEN_MODEL), { method: "POST", signal: ac.signal, headers: { "Authorization": "Bearer " + CF_TOKEN }, body: form });
+    } else {
+      r = await fetch(cfUrl(CF_MODEL), {
+        method: "POST", signal: ac.signal,
+        headers: { "Authorization": "Bearer " + CF_TOKEN, "content-type": "application/json" },
+        body: JSON.stringify({ prompt: ing.slice(0, 1500), steps: 6 })
+      });
+    }
     const v = await r.json().catch(() => ({}));
     const b64 = v.result && v.result.image;
     if (!r.ok || v.success === false || !b64) {
@@ -221,7 +255,7 @@ app.post("/api/gorsel", async (req, res) => {
         : (detay || "Görsel oluşturulamadı (" + r.status + ")");
       return res.status(502).json({ hata: msg });
     }
-    gorselSayac.adet++;
+    gorselSayac.adet += agirlik;
     res.json({ gorsel: "data:" + (b64.startsWith("iVBOR") ? "image/png" : "image/jpeg") + ";base64," + b64 });
   } catch (e) {
     if (res.headersSent) return;
