@@ -1,4 +1,3 @@
-
 const express = require("express");
 const crypto = require("crypto");
 const path = require("path");
@@ -17,23 +16,23 @@ const CF_DUZEN_MODEL = process.env.CF_DUZEN_MODEL || "@cf/black-forest-labs/flux
 const GORSEL_GUNLUK = +process.env.GORSEL_GUNLUK || 200;
 
 const ORTAK =
-  " Doğru, net ve dürüst ol; emin olmadığın bir şeyi uydurma, bilmiyorsan söyle. " +
-  "Güncel bilgi gerekiyorsa internet arama sonuçlarını kullan. " +
-  "İnternetten aldığın bilgileri doğru şekilde aktar ve kaynakları belirt.";
+  " Doğru, net ve dürüst ol; emin olmadığın şeyi uydurma." +
+  " Güncel bilgi gerekiyorsa internet araması yap." +
+  " İnternet kaynaklarını doğru aktar ve kaynakları belirt.";
 
 const MODLAR = {
-  genel: "Sen yardımsever, samimi bir Türkçe yapay zeka asistanısın. Kısa ve anlaşılır cevap ver.",
-  kodlama: "Sen uzman bir yazılım geliştiricisin. Türkçe açıkla, kodu her zaman markdown kod bloğu içinde ver, kısa ve doğru ol.",
-  cevirmen: "Sen profesyonel bir çevirmensin. Kullanıcı Türkçe yazarsa İngilizceye, başka dilde yazarsa Türkçeye çevir. Sadece çeviriyi ver.",
-  ozetleyici: "Sen bir özetleme asistanısın. Verilen metni Türkçe, madde madde ve kısa özetle.",
-  ders: "Sen sabırlı bir Türkçe öğretmensin. Soruyu önce kısaca anla, sonra adım adım çöz; nedenini açıkla. Sonda net sonucu ver ve cevabı kontrol et. Matematik ve fen formüllerini LaTeX ile yaz."
+  genel: "Sen AbdulGPT adında yardımsever, samimi ve gelişmiş bir Türkçe yapay zeka asistanısın.",
+  kodlama: "Sen uzman bir yazılım geliştiricisin. Türkçe açıkla, kodu markdown kod bloğunda ver.",
+  cevirmen: "Sen profesyonel bir çevirmensin. Türkçe yazıyı İngilizceye, diğer dilleri Türkçeye çevir. Sadece çeviriyi ver.",
+  ozetleyici: "Verilen metni Türkçe, madde madde ve kısa özetle.",
+  ders: "Sen sabırlı bir Türkçe öğretmensin. Soruyu adım adım çöz, nedenini açıkla ve sonucu kontrol et. Formülleri LaTeX ile yaz."
 };
 
 const LATEXSIZ =
-  " Matematik yazarken LaTeX ve dolar işareti ($) kullanma. Formülleri düz metinle yaz, örneğin: sin(30°) = 1/2, x^2, √9, 3 × 4.";
+  " Matematik yazarken LaTeX ve dolar işareti kullanma. Formülleri düz metinle yaz.";
 
 const HATIRLA =
-  " Kullanıcı kendisi hakkında kalıcı bir bilgi paylaşırsa (adı, sınıfı, mesleği, ilgi alanı, tercihi gibi), cevabının EN SONUNA ayrı bir satırda [HATIRLA: kısa bilgi] ekle. Sıradan sorularda ekleme.";
+  " Kullanıcı kendisi hakkında kalıcı bir bilgi paylaşırsa cevabının sonuna [HATIRLA: kısa bilgi] ekle.";
 
 const SIFRE = process.env.SIFRE || "";
 
@@ -45,7 +44,6 @@ const sifreTamam = g =>
 app.use(express.json({ limit: "6mb" }));
 app.use(express.static(path.join(__dirname, "public")));
 
-// Hız sınırı
 const sayac = new Map();
 
 setInterval(() => sayac.clear(), 60 * 1000).unref();
@@ -56,39 +54,42 @@ function limitKontrol(key, max = 10) {
   return n <= max;
 }
 
-// Otomatik internet araması
+// OTOMATİK İNTERNET ARAMASI
 function internetGerekli(mesaj) {
   const s = mesaj.toLocaleLowerCase("tr-TR");
 
   const kaliplar = [
-    /hava durumu|hava nasıl|yağmur yağacak mı|sıcaklık kaç/,
-    /son dakika|güncel haber|bugünkü haber|haberleri/,
+    /hava durumu|hava nasıl|yağmur yağacak mı/,
+    /son dakika|güncel haber|bugünkü haber/,
     /internette ara|internetten araştır|webde ara/,
-    /güncel bilgi|güncel olarak|şu anki|şu anda/,
-    /dolar kaç|euro kaç|sterlin kaç|altın fiyat|gram altın/,
+    /güncel bilgi|güncel olarak|şu anki/,
+    /dolar kaç|euro kaç|altın fiyat|gram altın/,
     /maç sonucu|canlı skor|puan durumu|fikstür/,
-    /en son gelişmeler|son gelişmeler|kaynak göster/,
-    /hava tahmini|kaç derece|ne zaman yayınlanacak/,
-    /kim kazandı|sonuçları ne|güncel fiyat/,
-    /2026 gelişmeleri|2025 gelişmeleri/,
-    /bugün.*(hava|haber|maç|fiyat|sonuç)/,
-    /yarın.*(hava|maç|etkinlik|sıcaklık)/,
-    /son seçim|güncel başkan|güncel yönetici/,
-    /yeni çıkan|en yeni|en son çıkan/
+    /en son gelişmeler|kaynak göster/,
+    /kaç derece|hava tahmini/,
+    /kim kazandı|güncel fiyat/,
+    /bugün.*(hava|haber|maç|fiyat)/,
+    /yarın.*(hava|maç|etkinlik)/,
+    /güncel başkan|güncel yönetici/,
+    /yeni çıkan|en yeni|en son çıkan/,
+    /araştır|kaynakları bul|kaynakları göster/,
+    /google'da ara|google da ara/,
+    /son.*(fiyat|model|sürüm|haber)/
   ];
 
   return kaliplar.some(k => k.test(s));
 }
 
-// Sistem durumu
 app.get("/api/durum", (req, res) => {
   res.json({
     sifreli: !!SIFRE,
-    internetArama: true
+    internetArama: !!API_KEY,
+    googleSearch: !!API_KEY,
+    gorsel: !!CF_HESAP && !!CF_TOKEN
   });
 });
 
-// Giriş
+// GİRİŞ
 app.post("/api/giris", (req, res) => {
   const k = "g" + (req.headers["x-forwarded-for"] || req.ip);
 
@@ -111,10 +112,7 @@ const IMG_RE =
 const url = m =>
   `https://generativelanguage.googleapis.com/v1beta/models/${m}:streamGenerateContent?alt=sse`;
 
-// --------------------------------------------------
-// ABDULGPT CHAT + İNTERNET ARAMASI
-// --------------------------------------------------
-
+// ABDULGPT CHAT + GOOGLE SEARCH
 app.post("/api/chat", async (req, res) => {
   if (!API_KEY) {
     return res.status(500).json({
@@ -216,7 +214,7 @@ app.post("/api/chat", async (req, res) => {
     (mod === "ders" ? "" : LATEXSIZ) +
     HATIRLA +
     (profil
-      ? " Kullanıcı hakkında bildiklerin (işine yaradığında doğal biçimde kullan): " + profil
+      ? " Kullanıcı hakkında bildiklerin: " + profil
       : "");
 
   const body = {
@@ -244,7 +242,6 @@ app.post("/api/chat", async (req, res) => {
     }
   };
 
-  // Otomatik veya manuel internet araması
   const sonMesaj = messages[messages.length - 1].content;
 
   const ara =
@@ -297,8 +294,10 @@ app.post("/api/chat", async (req, res) => {
 
       const msg =
         r.status === 429
-          ? "Ücretsiz kota doldu, biraz bekleyip tekrar dene. (Google: " + detay + ")"
-          : detay || "API hatası (" + r.status + ")";
+          ? "Google API kotası doldu. " + detay
+          : r.status === 403
+            ? "Google Search erişimini kontrol et. " + detay
+            : detay || "API hatası (" + r.status + ")";
 
       return res.status(502).json({ hata: msg });
     }
@@ -318,12 +317,15 @@ app.post("/api/chat", async (req, res) => {
 
     if (dusuldu) {
       send({
-        t: "(Derin model şu an kullanılamıyor, normal modelle cevapladım.)\n\n"
+        t: "(Derin model kullanılamıyor, normal modelle cevapladım.)\n\n"
       });
     }
 
     if (ara) {
-      send({ arama: true });
+      send({
+        arama: true,
+        aramaDurumu: "İnternet araştırması yapılıyor..."
+      });
     }
 
     const reader = r.body.getReader();
@@ -331,106 +333,169 @@ app.post("/api/chat", async (req, res) => {
 
     let buf = "";
     const kaynaklar = new Map();
+    const sorgular = new Set();
+    const kaynakDestekleri = [];function groundingIsle(meta) {
+      if (!meta) return;
 
-    while (true) {
-      const { done, value } = await reader.read();
+      const chunks = meta.groundingChunks || [];
 
-      if (done) break;
+      chunks.forEach((chunk) => {
+        const web = chunk.web;
+        if (!web || !web.uri) return;
 
-      buf += dec.decode(value, { stream: true });
-      buf = buf.replace(/\r\n/g, "\n");
+        const url = web.uri;
+        const baslik = web.title || "Web kaynağı";
 
-      let i;
-
-      while ((i = buf.indexOf("\n\n")) >= 0) {
-        const blok = buf.slice(0, i);
-        buf = buf.slice(i + 2);
-
-        const satir = blok
-          .split("\n")
-          .find(l => l.startsWith("data: "));
-
-        if (!satir) continue;
-
-        let ev;
-
-        try {
-          ev = JSON.parse(satir.slice(6));
-        } catch {
-          continue;
-        }
-
-        if (ev.promptFeedback?.blockReason) {
-          send({
-            hata: "Bu istek güvenlik nedeniyle engellendi."
+        if (!kaynaklar.has(url)) {
+          kaynaklar.set(url, {
+            baslik,
+            url
           });
-          continue;
         }
+      });
 
-        const aday = ev.candidates?.[0];
+      if (Array.isArray(meta.webSearchQueries)) {
+        meta.webSearchQueries.forEach((q) => {
+          if (q) sorgular.add(q);
+        });
+      }
 
-        // Metni gönder
-        const parcalar = aday?.content?.parts || [];
-
-        const metin = parcalar
-          .filter(p => p.text && !p.thought)
-          .map(p => p.text)
-          .join("");
-
-        if (metin) {
-          send({ t: metin });
-        }
-
-        // Google arama kaynaklarını yakala
-        const meta = aday?.groundingMetadata;
-
-        if (meta) {
-          const yeniKaynaklar = meta.groundingChunks || [];
-
-          for (const item of yeniKaynaklar) {
-            const web = item.web;
-
-            if (web?.uri) {
-              kaynaklar.set(web.uri, {
-                baslik: web.title || "İnternet kaynağı",
-                url: web.uri
-              });
-            }
-          }
-
-          const data = {
-            kaynaklar: Array.from(kaynaklar.values()),
-            aramaSorgulari: meta.webSearchQueries || []
-          };
-
-          // Google'ın arama önerisi HTML içeriği
-          if (meta.searchEntryPoint?.renderedContent) {
-            data.aramaOnerileriHtml =
-              meta.searchEntryPoint.renderedContent;
-          }
-
-          send(data);
-        }
+      if (Array.isArray(meta.groundingSupports)) {
+        meta.groundingSupports.forEach((destek) => {
+          kaynakDestekleri.push({
+            metin: destek.segment?.text || "",
+            kaynakIndeksleri:
+              destek.groundingChunkIndices || []
+          });
+        });
       }
     }
 
-    send({ bitti: true });
-    res.end();
+    try {
+      while (true) {
+        const { value, done } = await reader.read();
 
-  } catch (e) {
-    if (res.headersSent) {
-      res.end();
-    } else if (e.name !== "AbortError") {
-      res.status(500).json({
-        hata: "Sunucu hatası: " + e.message
+        if (done) break;
+
+        buf += dec.decode(value, { stream: true });
+        buf = buf.replace(/\r\n/g, "\n");
+
+        let bolumler = buf.split("\n\n");
+        buf = bolumler.pop() || "";
+
+        for (const bolum of bolumler) {
+          const satirlar = bolum.split("\n");
+
+          for (const satir of satirlar) {
+            if (!satir.startsWith("data: ")) continue;
+
+            const veri = satir.slice(6).trim();
+
+            if (!veri || veri === "[DONE]") continue;
+
+            let json;
+
+            try {
+              json = JSON.parse(veri);
+            } catch {
+              continue;
+            }
+
+            if (json.promptFeedback?.blockReason) {
+              send({
+                hata: "İstek güvenlik nedeniyle engellendi."
+              });
+              continue;
+            }
+
+            const aday = json.candidates?.[0];
+
+            if (!aday) continue;
+
+            const parcalar = aday.content?.parts || [];
+
+            const metin = parcalar
+              .filter((p) => p.text && !p.thought)
+              .map((p) => p.text)
+              .join("");
+
+            if (metin) {
+              send({ t: metin });
+            }
+
+            if (aday.groundingMetadata) {
+              groundingIsle(aday.groundingMetadata);
+            }
+          }
+        }
+      }
+
+      if (buf.trim()) {
+        const satirlar = buf.split("\n");
+
+        for (const satir of satirlar) {
+          if (!satir.startsWith("data: ")) continue;
+
+          const veri = satir.slice(6).trim();
+
+          if (!veri || veri === "[DONE]") continue;
+
+          try {
+            const json = JSON.parse(veri);
+            const aday = json.candidates?.[0];
+
+            if (!aday) continue;
+
+            const parcalar = aday.content?.parts || [];
+
+            const metin = parcalar
+              .filter((p) => p.text && !p.thought)
+              .map((p) => p.text)
+              .join("");
+
+            if (metin) {
+              send({ t: metin });
+            }
+
+            if (aday.groundingMetadata) {
+              groundingIsle(aday.groundingMetadata);
+            }
+          } catch {
+            // Eksik veya geçersiz SSE verisini atla.
+          }
+        }
+      }
+
+      send({
+        kaynaklar: Array.from(kaynaklar.values()),
+        sorgular: Array.from(sorgular),
+        kaynakDestekleri
       });
+
+      send({
+        bitti: true,
+        internetArandi: ara,
+        kaynakSayisi: kaynaklar.size
+      });
+
+      res.end();
+
+    } catch (err) {
+      console.error("SSE Hatası:", err);
+
+      send({
+        hata: "Yanıt oluşturulurken bir hata oluştu."
+      });
+
+      res.end();
     }
   }
-});
+);
 
-// --------------------------------------------------
+
+// =====================================================
 // GÖRSEL OLUŞTURMA VE DÜZENLEME
-// --------------------------------------------------
+// =====================================================
 
 const gorselSayac = {
   gun: "",
@@ -438,124 +503,6 @@ const gorselSayac = {
 };
 
 async function gorselIstemi(istem, signal, resim) {
-  const SISTEM_YENI =
-    "You write prompts for an image generator. Translate the user's request into one vivid English image prompt (max 60 words), adding helpful visual detail (style, lighting, composition) without changing the meaning. Output only the prompt. If the request is sexual, graphically violent, hateful, or shows a real person in a harmful way, output exactly REFUSE.";
-
-  const SISTEM_DUZEN =
-    "You write instructions for an image editing model. The user gives an edit request for the attached image. Translate it into one clear English instruction (max 40 words) that describes only the change, and end with: Keep everything else unchanged. Output only the instruction. Output exactly REFUSE if the request or the image involves sexual content, graphic violence, hate, or if the edit could embarrass, sexualize, impersonate or harm a real, identifiable person.";
-
-  try {
-    const parts = [{ text: istem }];
-
-    if (resim) {
-      parts.push({ inlineData: resim });
-    }
-
-    const r = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`,
-      {
-        method: "POST",
-        signal,
-        headers: {
-          "content-type": "application/json",
-          "x-goog-api-key": API_KEY
-        },
-        body: JSON.stringify({
-          systemInstruction: {
-            parts: [{
-              text: resim ? SISTEM_DUZEN : SISTEM_YENI
-            }]
-          },
-          contents: [{
-            role: "user",
-            parts
-          }],
-          generationConfig: {
-            maxOutputTokens: 1000
-          }
-        })
-      }
-    );
-
-    const v = await r.json().catch(() => ({}));
-
-    const m = (v.candidates?.[0]?.content?.parts || [])
-      .filter(p => p.text && !p.thought)
-      .map(p => p.text)
-      .join("")
-      .trim();
-
-    return m || (resim ? "REFUSE" : istem);
-
-  } catch (e) {
-    if (e.name === "AbortError") throw e;
-    return resim ? "REFUSE" : istem;
-  }
-}
-
-app.post("/api/gorsel", async (req, res) => {
-  if (!CF_HESAP || !CF_TOKEN) {
-    return res.status(500).json({
-      hata: "Sunucuda CLOUDFLARE_ACCOUNT_ID ve CLOUDFLARE_API_TOKEN tanımlı değil."
-    });
-  }
-
-  let gs = "";
-
-  try {
-    gs = decodeURIComponent(req.headers["x-sifre"] || "");
-  } catch {}
-
-  if (!sifreTamam(gs)) {
-    return res.status(401).json({
-      hata: "Şifre gerekli veya yanlış."
-    });
-  }
-
-  const k = "r" + (req.headers["x-forwarded-for"] || req.ip);
-
-  if (!limitKontrol(k, 4)) {
-    return res.status(429).json({
-      hata: "Çok hızlı gidiyorsun, bir dakika bekle."
-    });
-  }
-
-  const istem = req.body && req.body.istem;
-
-  if (
-    !istem ||
-    typeof istem !== "string" ||
-    !istem.trim() ||
-    istem.length > 800
-  ) {
-    return res.status(400).json({
-      hata: "İstem boş ya da çok uzun (en fazla 800 karakter)."
-    });
-  }
-
-  let resim = null;
-  const kaynak = req.body.kaynak;
-
-  if (kaynak !== undefined && kaynak !== null) {
-    const g =
-      typeof kaynak === "string" && kaynak.length < 1500000
-        ? IMG_RE.exec(kaynak)
-        : null;
-
-    if (!g) {
-      return res.status(400).json({
-        hata: "Düzenlenecek görsel geçersiz."
-      });
-    }
-
-    resim = {
-      mimeType: g[1],
-      data: g[2]
-    };
-  }
-
-  const agirlik = resim ? 3 : 1;
-
   const bugun = new Date().toISOString().slice(0, 10);
 
   if (gorselSayac.gun !== bugun) {
@@ -563,150 +510,89 @@ app.post("/api/gorsel", async (req, res) => {
     gorselSayac.adet = 0;
   }
 
-  if (gorselSayac.adet + agirlik > GORSEL_GUNLUK) {
-    return res.status(429).json({
-      hata: "Bugünlük görsel limiti doldu, yarın tekrar dene."
-    });
+  if (gorselSayac.adet >= 30) {
+    throw new Error("Günlük görsel oluşturma sınırına ulaşıldı.");
   }
 
-  const ac = new AbortController();
-  const zaman = setTimeout(() => ac.abort(), 60000);
+  const model = resim
+    ? "@cf/black-forest-labs/flux-1-kontext-pro"
+    : "@cf/black-forest-labs/flux-1-schnell";
 
-  res.on("close", () => {
-    if (!res.writableEnded) ac.abort();
+  const inputs = {
+    prompt: istem
+  };
+
+  if (resim) {
+    inputs.image = resim;
+  }
+
+  const url =
+    `https://api.cloudflare.com/client/v4/accounts/${CF_HESAP}/ai/run/${model}`;
+
+  const response = await fetch(url, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${CF_TOKEN}`,
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify(inputs),
+    signal
   });
 
+  if (!response.ok) {
+    const hata = await response.text();
+    throw new Error(`Görsel API hatası: ${hata}`);
+  }
+
+  gorselSayac.adet++;
+
+  const sonuc = await response.json();
+
+  return sonuc;
+}
+
+
+app.post("/api/gorsel", async (req, res) => {
   try {
-    const ing = await gorselIstemi(
-      istem.trim(),
-      ac.signal,
-      resim
+    const {
+      prompt,
+      image
+    } = req.body || {};
+
+    if (!prompt || typeof prompt !== "string") {
+      return res.status(400).json({
+        hata: "Görsel açıklaması gerekli."
+      });
+    }
+
+    if (!CF_HESAP || !CF_TOKEN) {
+      return res.status(500).json({
+        hata: "Görsel oluşturma ayarları eksik."
+      });
+    }
+
+    const sonuc = await gorselIstemi(
+      prompt,
+      undefined,
+      image || null
     );
 
-    if (/^REFUSE\b/i.test(ing)) {
-      return res.status(422).json({
-        hata: "Bu istek güvenlik kuralları nedeniyle reddedildi."
-      });
-    }
+    res.json(sonuc);
 
-    let r;
+  } catch (err) {
+    console.error("Görsel oluşturma hatası:", err);
 
-    const cfUrl = m =>
-      `https://api.cloudflare.com/client/v4/accounts/${CF_HESAP}/ai/run/${m}`;
-
-    if (resim) {
-      const en = +req.body.en;
-      const boy = +req.body.boy;
-
-      let w = 1024;
-      let h = 1024;
-
-      if (en > 0 && boy > 0) {
-        const o = 1024 / Math.max(en, boy);
-
-        const kenet = x =>
-          Math.min(1024, Math.max(256, Math.round(x / 64) * 64));
-
-        w = kenet(en * o);
-        h = kenet(boy * o);
-      }
-
-      const form = new FormData();
-
-      form.append("prompt", ing.slice(0, 1500));
-
-      form.append(
-        "input_image_0",
-        new Blob(
-          [Buffer.from(resim.data, "base64")],
-          { type: resim.mimeType }
-        ),
-        "kaynak.jpg"
-      );
-
-      form.append("width", String(w));
-      form.append("height", String(h));
-
-      r = await fetch(cfUrl(CF_DUZEN_MODEL), {
-        method: "POST",
-        signal: ac.signal,
-        headers: {
-          "Authorization": "Bearer " + CF_TOKEN
-        },
-        body: form
-      });
-
-    } else {
-      r = await fetch(cfUrl(CF_MODEL), {
-        method: "POST",
-        signal: ac.signal,
-        headers: {
-          "Authorization": "Bearer " + CF_TOKEN,
-          "content-type": "application/json"
-        },
-        body: JSON.stringify({
-          prompt: ing.slice(0, 1500),
-          steps: 6
-        })
-      });
-    }
-
-    const v = await r.json().catch(() => ({}));
-    const b64 = v.result && v.result.image;
-
-    if (!r.ok || v.success === false || !b64) {
-      const detay =
-        (v.errors?.[0]?.message || "").slice(0, 200);
-
-      const msg =
-        r.status === 429
-          ? "Günlük ücretsiz görsel kotası doldu, yarın tekrar dene."
-          : /nsfw|flag|safety/i.test(detay)
-            ? "Bu istek güvenlik kuralları nedeniyle reddedildi."
-            : detay || "Görsel oluşturulamadı (" + r.status + ")";
-
-      return res.status(502).json({
-        hata: msg
-      });
-    }
-
-    gorselSayac.adet += agirlik;
-
-    res.json({
-      gorsel:
-        "data:" +
-        (b64.startsWith("iVBOR") ? "image/png" : "image/jpeg") +
-        ";base64," +
-        b64
+    res.status(500).json({
+      hata: err.message || "Görsel oluşturulamadı."
     });
-
-  } catch (e) {
-    if (res.headersSent) {
-      return;
-    }
-
-    if (e.name === "AbortError") {
-      res.status(504).json({
-        hata: "Görsel çok uzun sürdü, tekrar dene."
-      });
-    } else {
-      res.status(500).json({
-        hata: "Görsel servisine ulaşılamadı: " + e.message
-      });
-    }
-
-  } finally {
-    clearTimeout(zaman);
   }
 });
 
-// --------------------------------------------------
+
+// =====================================================
 // SUNUCUYU BAŞLAT
-// --------------------------------------------------
+// =====================================================
 
 app.listen(PORT, () => {
-  console.log("AbdulGPT çalışıyor: " + PORT);
-  console.log("İnternet araması: Aktif");
-  console.log("Görsel oluşturma: " + (!!CF_HESAP && !!CF_TOKEN));
+  console.log(`AbdulGPT sunucusu ${PORT} portunda çalışıyor.`);
 });
-         
