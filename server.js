@@ -334,7 +334,8 @@ app.post("/api/chat", async (req, res) => {
     let buf = "";
     const kaynaklar = new Map();
     const sorgular = new Set();
-    const kaynakDestekleri = [];function groundingIsle(meta) {
+    const kaynakDestekleri = [];
+    function groundingIsle(meta) {
       if (!meta) return;
 
       const chunks = meta.groundingChunks || [];
