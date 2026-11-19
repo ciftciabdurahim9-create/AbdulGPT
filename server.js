@@ -23,10 +23,51 @@ const CF_DUZEN_MODEL =
   process.env.CF_DUZEN_MODEL ||
   "@cf/black-forest-labs/flux-1-kontext-pro";
 
-const GORSEL_GUNLUK = Number(process.env.GORSEL_GUNLUK) || 200;
+app.use(express.json({ limit: "10mb" }));
+app.use(express.static(path.join(__dirname, "public")));
 
 
-// GÜNCEL TÜRKİYE SAATİ
+// GÜVENLİK
+
+const SIFRE = process.env.SIFRE || "";
+
+function ozet(metin) {
+  return crypto
+    .createHash("sha256")
+    .update(String(metin))
+    .digest();
+}
+
+function sifreTamam(gelen) {
+  return crypto.timingSafeEqual(
+    ozet(gelen || ""),
+    ozet(SIFRE)
+  );
+}
+
+
+// İSTEK SINIRLANDIRMA
+
+const sayac = new Map();
+
+setInterval(() => {
+  sayac.clear();
+}, 60000).unref();
+
+function limitKontrol(key, max = 30) {
+  const sayi = (sayac.get(key) || 0) + 1;
+  sayac.set(key, sayi);
+  return sayi <= max;
+}
+
+function istemciIP(req) {
+  return String(
+    req.headers["x-forwarded-for"] || req.ip
+  ).split(",")[0].trim();
+}
+
+
+// TÜRKİYE SAATİ
 
 function turkiyeZamani() {
   return new Intl.DateTimeFormat("tr-TR", {
@@ -43,56 +84,38 @@ function turkiyeZamani() {
 }
 
 
-// SİSTEM TALİMATLARI
-
-const ORTAK =
-  " Doğru, net ve dürüst ol; emin olmadığın şeyi uydurma." +
-  " Güncel bilgi gerekiyorsa internet araması yap." +
-  " İnternet kaynaklarını doğru aktar ve kaynakları belirt.";
+// MODEL TALİMATLARI
 
 const MODLAR = {
-  genel: "Sen AbdulGPT adında yardımsever, samimi ve gelişmiş bir Türkçe yapay zeka asistanısın.",
-  kodlama: "Sen uzman bir yazılım geliştiricisin. Türkçe açıkla, kodu markdown kod bloğunda ver.",
-  cevirmen: "Sen profesyonel bir çevirmensin. Türkçe yazıyı İngilizceye, diğer dilleri Türkçeye çevir. Sadece çeviriyi ver.",
-  ozetleyici: "Verilen metni Türkçe, madde madde ve kısa özetle.",
-  ders: "Sen sabırlı bir Türkçe öğretmensin. Soruyu adım adım çöz, nedenini açıkla ve sonucu kontrol et. Formülleri LaTeX ile yaz."
+  genel:
+    "Sen AbdulGPT adında gelişmiş, yardımsever ve Türkçe konuşan bir yapay zeka asistanısın.",
+
+  kodlama:
+    "Sen uzman bir yazılım geliştiricisin. Kodları eksiksiz, düzenli ve açıklamalı ver.",
+
+  cevirmen:
+    "Sen profesyonel bir çevirmensin. İstenen metni doğru ve doğal biçimde çevir.",
+
+  ozetleyici:
+    "Sen profesyonel bir özetleme asistanısın. Metinleri önemli noktaları koruyarak özetle.",
+
+  ders:
+    "Sen sabırlı bir öğretmensin. Konuları adım adım, anlaşılır Türkçe ile açıkla."
 };
 
+const ORTAK_TALIMAT =
+  " Doğru ve dürüst ol. Bilmediğin bilgileri uydurma." +
+  " Güncel bilgi gerekiyorsa internet araştırmasını kullan." +
+  " Kaynakları açıkça belirt. Emin olmadığın konularda belirsizliği açıkla.";
+
 const LATEXSIZ =
-  " Matematik yazarken LaTeX ve dolar işareti kullanma. Formülleri düz metinle yaz.";
-
-const HATIRLA =
-  " Kullanıcı kendisi hakkında kalıcı bir bilgi paylaşırsa cevabının sonuna [HATIRLA: kısa bilgi] ekle.";
-
-const SIFRE = process.env.SIFRE || "";
-
-const ozet = x =>
-  crypto.createHash("sha256").update(String(x)).digest();
-
-const sifreTamam = g =>
-  !SIFRE || crypto.timingSafeEqual(ozet(g || ""), ozet(SIFRE));
-
-app.use(express.json({ limit: "6mb" }));
-app.use(express.static(path.join(__dirname, "public")));
+  " Matematik ifadelerini LaTeX kullanmadan düz metinle yaz.";
 
 
-// İSTEK SINIRLANDIRMA
-
-const sayac = new Map();
-
-setInterval(() => sayac.clear(), 60 * 1000).unref();
-
-function limitKontrol(key, max = 10) {
-  const n = (sayac.get(key) || 0) + 1;
-  sayac.set(key, n);
-  return n <= max;
-}
-
-
-// OTOMATİK İNTERNET ARAMASI
+// İNTERNET ARAMASI GEREKLİ Mİ?
 
 function internetGerekli(mesaj) {
-  const s = mesaj.toLocaleLowerCase("tr-TR");
+  const s = String(mesaj).toLocaleLowerCase("tr-TR");
 
   const kaliplar = [
     /hava durumu|hava nasıl|yağmur yağacak mı/,
@@ -106,10 +129,8 @@ function internetGerekli(mesaj) {
     /kim kazandı|güncel fiyat/,
     /bugün.*(hava|haber|maç|fiyat)/,
     /yarın.*(hava|maç|etkinlik)/,
-    /güncel başkan|güncel yönetici/,
     /yeni çıkan|en yeni|en son çıkan/,
     /araştır|kaynakları bul|kaynakları göster/,
-    /google'da ara|google da ara/,
     /son.*(fiyat|model|sürüm|haber)/
   ];
 
@@ -117,7 +138,7 @@ function internetGerekli(mesaj) {
 }
 
 
-// GELİŞMİŞ ARAŞTIRMA - KAYNAK SINIFLANDIRMA
+// KAYNAK SINIFLANDIRMA
 
 function kaynakTuru(urlString) {
   try {
@@ -126,11 +147,22 @@ function kaynakTuru(urlString) {
       .replace(/^www\./, "");
 
     const resmiAlanlar = [
-      "openai.com", "anthropic.com", "google.com",
-      "deepmind.google", "blog.google", "cloud.google.com",
-      "ai.meta.com", "about.fb.com", "microsoft.com",
-      "blogs.microsoft.com", "nvidia.com", "apple.com",
-      "who.int", "un.org", "europa.eu", "gov.tr", "edu.tr"
+      "openai.com",
+      "anthropic.com",
+      "google.com",
+      "deepmind.google",
+      "blog.google",
+      "cloud.google.com",
+      "ai.meta.com",
+      "about.fb.com",
+      "microsoft.com",
+      "nvidia.com",
+      "apple.com",
+      "who.int",
+      "un.org",
+      "europa.eu",
+      "gov.tr",
+      "edu.tr"
     ];
 
     if (
@@ -142,10 +174,16 @@ function kaynakTuru(urlString) {
     }
 
     const haberAlanlari = [
-      "reuters.com", "apnews.com", "bbc.com",
-      "bbc.co.uk", "theguardian.com", "nytimes.com",
-      "bloomberg.com", "techcrunch.com",
-      "theverge.com", "wired.com"
+      "reuters.com",
+      "apnews.com",
+      "bbc.com",
+      "bbc.co.uk",
+      "theguardian.com",
+      "nytimes.com",
+      "bloomberg.com",
+      "techcrunch.com",
+      "theverge.com",
+      "wired.com"
     ];
 
     if (
@@ -157,22 +195,24 @@ function kaynakTuru(urlString) {
     return "Diğer kaynak";
 
   } catch {
-    return "Kaynağın alan adı belirlenemedi";
+    return "Bilinmeyen kaynak";
   }
 }
 
 
-// KAYNAKLARI METNE DÖNÜŞTÜRME
+// KAYNAKLARI METNE DÖNÜŞTÜR
 
 function kaynaklariMetneCevir(kaynaklar) {
-  return kaynaklar.map((k, i) => [
-    "[" + (i + 1) + "]",
-    "Başlık: " + (k.title || "Başlıksız"),
-    "URL: " + (k.url || ""),
-    "Kaynak türü: " + kaynakTuru(k.url || ""),
-    "Yayın tarihi: " + (k.published_date || k.date || "Belirtilmemiş"),
-    "İçerik: " + String(k.content || "").slice(0, 2200)
-  ].join("\n")).join("\n\n");
+  return kaynaklar.map((k, i) => {
+    return [
+      `[${i + 1}]`,
+      "Başlık: " + (k.title || "Başlıksız"),
+      "URL: " + (k.url || ""),
+      "Kaynak türü: " + kaynakTuru(k.url || ""),
+      "Tarih: " + (k.published_date || "Belirtilmemiş"),
+      "İçerik: " + String(k.content || "").slice(0, 2200)
+    ].join("\n");
+  }).join("\n\n");
 }
 
 
@@ -190,7 +230,7 @@ async function geminiTekSefer(
   const response = await fetch(endpoint, {
     method: "POST",
     headers: {
-      "content-type": "application/json",
+      "Content-Type": "application/json",
       "x-goog-api-key": API_KEY
     },
     body: JSON.stringify({
@@ -209,8 +249,7 @@ async function geminiTekSefer(
 
   if (!response.ok) {
     throw new Error(
-      data.error?.message ||
-      "Gemini araştırma kontrolü başarısız (" + response.status + ")."
+      data.error?.message || "Gemini API hatası: " + response.status
     );
   }
 
@@ -228,10 +267,8 @@ app.get("/api/durum", (req, res) => {
   res.json({
     sifreli: !!SIFRE,
     internetArama: !!TAVILY_API_KEY,
-    googleSearch: false,
     tavilySearch: !!TAVILY_API_KEY,
-    gelismisArastirma: !!TAVILY_API_KEY,
-    kaynakDogrulama: !!API_KEY,
+    gelismisArastirma: !!TAVILY_API_KEY && !!API_KEY,
     gorsel: !!CF_HESAP && !!CF_TOKEN,
     tarih: turkiyeZamani(),
     saatDilimi: "Europe/Istanbul"
@@ -242,218 +279,287 @@ app.get("/api/durum", (req, res) => {
 // GİRİŞ API
 
 app.post("/api/giris", (req, res) => {
-  const k = "g" + (req.headers["x-forwarded-for"] || req.ip);
-
-  if (!limitKontrol(k, 10)) {
+  if (!limitKontrol("giris:" + istemciIP(req), 10)) {
     return res.status(429).json({
-      hata: "Çok fazla deneme, bir dakika bekle."
+      hata: "Çok fazla deneme yaptın. Biraz bekle."
     });
   }
 
-  if (sifreTamam(req.body && req.body.sifre)) {
+  if (sifreTamam(req.body?.sifre)) {
     return res.json({ ok: true });
   }
 
-  res.status(401).json({ hata: "Şifre yanlış." });
+  return res.status(401).json({
+    hata: "Şifre yanlış."
+  });
 });
 
 
-const IMG_RE =
-  /^data:(image\/(?:jpeg|png|webp));base64,([A-Za-z0-9+\/=]+)$/;
+// GÖRSEL VERİ KONTROLÜ
 
-const url = m =>
-  `https://generativelanguage.googleapis.com/v1beta/models/${m}:streamGenerateContent?alt=sse`;
-  
+const IMG_RE =
+  /^data:(image\/(?:jpeg|png|webp));base64,([A-Za-z0-9+/=]+)$/;
+
+const geminiStreamURL = model =>
+  `https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?alt=sse`;
+
 
 // CHAT API
 
 app.post("/api/chat", async (req, res) => {
-  const ip = req.headers["x-forwarded-for"] || req.ip;
+  const ip = istemciIP(req);
 
   if (!limitKontrol("chat:" + ip, 30)) {
-    return res.status(429).json({ hata: "Çok fazla istek gönderdin. Biraz bekle." });
+    return res.status(429).json({
+      hata: "Çok fazla istek gönderdin. Biraz bekle."
+    });
   }
 
   if (!sifreTamam(req.headers["x-sifre"])) {
-    return res.status(401).json({ hata: "Giriş gerekli." });
+    return res.status(401).json({
+      hata: "Giriş gerekli."
+    });
   }
 
   if (!API_KEY) {
-    return res.status(500).json({ hata: "Gemini API anahtarı ayarlanmamış." });
+    return res.status(500).json({
+      hata: "Gemini API anahtarı ayarlanmamış."
+    });
   }
 
-  const {
-    mesaj,
-    gecmis = [],
-    mod = "genel",
-    latex = true,
-    guclu = false
-  } = req.body || {};
+  const body = req.body || {};
 
-  if (!mesaj || typeof mesaj !== "string") {
-    return res.status(400).json({ hata: "Mesaj boş olamaz." });
+  // FARKLI ÖN YÜZ MESAJ FORMATLARINI DESTEKLE
+
+  const messages = Array.isArray(body.messages)
+    ? body.messages
+    : [];
+
+  const sonMesaj = [...messages]
+    .reverse()
+    .find(m =>
+      m &&
+      (m.role === "user" || m.role === "human") &&
+      typeof (m.content || m.text) === "string"
+    );
+
+  const mesaj = String(
+    body.mesaj ||
+    body.message ||
+    body.prompt ||
+    sonMesaj?.content ||
+    sonMesaj?.text ||
+    ""
+  ).trim();
+
+  if (!mesaj) {
+    return res.status(400).json({
+      hata: "Mesaj boş olamaz. Ön yüzden mesaj alanı kontrol edilmeli."
+    });
   }
 
-  const secilenMod = MODLAR[mod] || MODLAR.genel;
-  const matematikTalimat = latex ? "" : LATEXSIZ;
+  const gecmisKaynak = Array.isArray(body.gecmis)
+    ? body.gecmis
+    : messages;
 
-  const tarihTalimat =
-    "\n\nŞu anki Türkiye tarihi ve saati: " +
-    turkiyeZamani() +
-    ". Tarih sorularında bu bilgiyi esas al.";
+  const gecmis = gecmisKaynak
+    .filter(m => m && m !== sonMesaj)
+    .slice(-20)
+    .map(m => {
+      const role =
+        m.role === "assistant" || m.role === "model"
+          ? "model"
+          : "user";
+
+      const text = String(
+        m.content || m.text || ""
+      ).trim();
+
+      return {
+        role,
+        parts: [{ text: text.slice(0, 8000) }]
+      };
+    })
+    .filter(m => m.parts[0].text);
+
+  const mod = body.mod || "genel";
+  const latex = body.latex !== false;
+
+  const guclu =
+    body.derin === true ||
+    body.guclu === true ||
+    body.deepResearch === true ||
+    body.gelismisArastirma === true;
 
   const systemInstruction =
-    secilenMod +
-    ORTAK +
-    HATIRLA +
-    matematikTalimat +
-    tarihTalimat;
+    (MODLAR[mod] || MODLAR.genel) +
+    ORTAK_TALIMAT +
+    (latex ? "" : LATEXSIZ) +
+    "\n\nTürkiye tarihi ve saati: " +
+    turkiyeZamani() +
+    ". Güncel tarih sorularında bu bilgiyi kullan.";
 
   let kaynaklar = [];
-  let aramaMetni = "";
   let aramaYapildi = false;
 
-  // İNTERNET ARAŞTIRMASI
+  // TAVILY İNTERNET ARAŞTIRMASI
 
   if (internetGerekli(mesaj) && TAVILY_API_KEY) {
     try {
-      const aramaSorgulari = [
+      const sorgular = [
         mesaj,
         mesaj + " güncel gelişmeler",
-        mesaj + " resmi açıklama ve güvenilir kaynaklar"
+        mesaj + " resmî açıklamalar güvenilir kaynaklar"
       ];
 
-      const tumSonuclar = [];
+      const bulunanlar = [];
 
-      for (const sorgu of aramaSorgulari) {
-        const arama = await fetch("https://api.tavily.com/search", {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({
-            api_key: TAVILY_API_KEY,
-            query: sorgu,
-            search_depth: "basic",
-            topic: "general",
-            max_results: 5,
-            include_answer: false,
-            include_raw_content: false
-          })
-        });
+      for (const sorgu of sorgular) {
+        const response = await fetch(
+          "https://api.tavily.com/search",
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+              api_key: TAVILY_API_KEY,
+              query: sorgu,
+              search_depth: "basic",
+              topic: "general",
+              max_results: 5,
+              include_answer: false,
+              include_raw_content: false
+            })
+          }
+        );
 
-        if (!arama.ok) continue;
+        if (!response.ok) {
+          console.error("Tavily HTTP:", response.status);
+          continue;
+        }
 
-        const veri = await arama.json();
-        tumSonuclar.push(...(veri.results || []));
+        const data = await response.json();
+        bulunanlar.push(...(data.results || []));
       }
 
       const benzersiz = new Map();
 
-      for (const sonuc of tumSonuclar) {
-        if (sonuc.url && !benzersiz.has(sonuc.url)) {
-          benzersiz.set(sonuc.url, sonuc);
+      for (const k of bulunanlar) {
+        if (k.url && !benzersiz.has(k.url)) {
+          benzersiz.set(k.url, k);
         }
       }
 
       kaynaklar = [...benzersiz.values()].slice(0, 10);
-      aramaMetni = kaynaklariMetneCevir(kaynaklar);
       aramaYapildi = kaynaklar.length > 0;
 
-    } catch (hata) {
-      console.error("Tavily arama hatası:", hata.message);
+    } catch (error) {
+      console.error("Tavily araştırma hatası:", error.message);
     }
   }
+
+  const kaynakMetni = kaynaklariMetneCevir(kaynaklar);
 
   const arastirmaTalimatı = aramaYapildi
     ? `
 
-İNTERNET ARAŞTIRMASI SONUÇLARI:
+İNTERNET ARAŞTIRMASI:
 
-${aramaMetni}
+${kaynakMetni}
 
-ARAŞTIRMA KURALLARI:
-- Cevabını bulunan kaynaklara dayandır.
-- Kaynaklarda olmayan bilgileri kesin gerçek gibi sunma.
+KURALLAR:
+- Cevabını kaynaklara dayandır.
+- Kaynakta olmayan bilgileri uydurma.
 - Resmî kaynakları önceliklendir.
-- Birden fazla kaynak birbiriyle çelişiyorsa bunu belirt.
-- Güncel olmayan bilgileri güncelmiş gibi gösterme.
-- Kaynak numaralarını [1], [2] şeklinde kullan.
-- Kaynakların türünü değerlendirirken alan adı sınıflandırmasının tek başına güvenilirlik kanıtı olmadığını unutma.
+- Çelişkili bilgileri belirt.
+- Tarihi belli olmayan bilgileri güncelmiş gibi sunma.
+- Kaynak numaralarını [1], [2] şeklinde göster.
+- Kaynak türü sınıflandırmasını kesin güvenilirlik kanıtı olarak görme.
+- Cevabın sonunda kaynak bağlantılarını ver.
 `
     : "";
 
-  const sonSystem = systemInstruction + arastirmaTalimatı;
-
-  const sonGecmis = Array.isArray(gecmis)
-    ? gecmis.slice(-20).map(x => ({
-        role: x.role === "model" ? "model" : "user",
-        parts: [{
-          text: String(x.text || "").slice(0, 8000)
-        }]
-      })).filter(x => x.parts[0].text)
-    : [];
+  const sonSystem =
+    systemInstruction + arastirmaTalimatı;
 
   const contents = [
-    ...sonGecmis,
-    { role: "user", parts: [{ text: mesaj }] }
+    ...gecmis,
+    {
+      role: "user",
+      parts: [{ text: mesaj }]
+    }
   ];
 
-  const model = guclu ? MODEL_GUCLU : MODEL;
+  const secilenModel = guclu
+    ? MODEL_GUCLU
+    : MODEL;
 
-  // GELİŞMİŞ ARAŞTIRMA: TASLAK VE İKİNCİ KONTROL
+  // GELİŞMİŞ ARAŞTIRMA VE İKİNCİ DENETİM
 
   let denetimTalimatı = "";
 
-  if (aramaYapildi && guclu) {
+  if (guclu && aramaYapildi) {
     try {
       const taslak = await geminiTekSefer(
-        model,
+        secilenModel,
         sonSystem +
-          "\nÖnce araştırma sonuçlarına dayanarak kısa bir cevap taslağı oluştur. " +
-          "Kaynaklarda bulunmayan bilgileri ekleme.",
+          "\nKaynaklara dayanarak cevap taslağı oluştur. " +
+          "Desteklenmeyen iddiaları ekleme.",
         contents,
         2500
       );
 
       const denetim = await geminiTekSefer(
         MODEL,
-        `Sen bağımsız bir bilgi doğrulama denetçisisin.
-Aşağıdaki cevap taslağını kaynaklarla karşılaştır.
-Yanlış, desteklenmeyen, eski veya abartılı iddiaları belirle.
-Kaynakların doğrulamadığı iddiaları açıkça işaretle.
+        `Bağımsız bilgi doğrulama denetçisi olarak çalış.
+
+Aşağıdaki taslağı kaynaklarla karşılaştır.
+Yanlış, eski veya desteklenmeyen iddiaları belirle.
+Kaynaklarda bulunmayan bilgileri işaretle.
 Yeni bilgi uydurma.
 
 KAYNAKLAR:
-${aramaMetni}
+${kaynakMetni}
 
-CEVAP TASLAĞI:
+TASLAK:
 ${taslak}
 
-Denetim sonucunu kısa ve maddeler halinde yaz.`,
-        [{ role: "user", parts: [{ text: "Taslağı denetle." }] }],
+Denetim sonucunu maddeler halinde yaz.`,
+        [{
+          role: "user",
+          parts: [{ text: "Taslağı denetle." }]
+        }],
         1500
       );
 
       denetimTalimatı = `
 
-BAĞIMSIZ DENETİM SONUCU:
+İKİNCİ DENETİM SONUCU:
 ${denetim}
 
-Son cevabını hazırlarken bu denetimi dikkate al.
+Son cevabında bu denetimi dikkate al.
 Desteklenmeyen iddiaları çıkar veya belirsiz olduklarını belirt.
 `;
 
-    } catch (hata) {
-      console.error("Araştırma denetimi hatası:", hata.message);
+    } catch (error) {
+      console.error("Denetim hatası:", error.message);
     }
   }
 
-  const finalSystem = sonSystem + denetimTalimatı;
+  const finalSystem =
+    sonSystem + denetimTalimatı;
 
-  // GEMINI SSE AKIŞI
+  // STREAMING YANIT
 
-  res.setHeader("Content-Type", "text/event-stream; charset=utf-8");
+  res.setHeader(
+    "Content-Type",
+    "text/event-stream; charset=utf-8"
+  );
+
   res.setHeader("Cache-Control", "no-cache, no-transform");
   res.setHeader("Connection", "keep-alive");
+
   res.flushHeaders?.();
 
   let kapandi = false;
@@ -463,35 +569,39 @@ Desteklenmeyen iddiaları çıkar veya belirsiz olduklarını belirt.
   });
 
   try {
-    const response = await fetch(url(model), {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-        "x-goog-api-key": API_KEY
-      },
-      body: JSON.stringify({
-        systemInstruction: {
-          parts: [{ text: finalSystem }]
+    const response = await fetch(
+      geminiStreamURL(secilenModel),
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-goog-api-key": API_KEY
         },
-        contents,
-        generationConfig: {
-          temperature: 0.7,
-          maxOutputTokens: 6000
-        }
-      })
-    });
+        body: JSON.stringify({
+          systemInstruction: {
+            parts: [{ text: finalSystem }]
+          },
+          contents,
+          generationConfig: {
+            temperature: 0.7,
+            maxOutputTokens: 6000
+          }
+        })
+      }
+    );
 
     if (!response.ok) {
       const hata = await response.json().catch(() => ({}));
+
       throw new Error(
-        hata.error?.message || "Gemini API hatası: " + response.status
+        hata.error?.message ||
+        "Gemini API hatası: " + response.status
       );
     }
 
     const reader = response.body.getReader();
     const decoder = new TextDecoder();
 
-    let biriken = "";
     let tampon = "";
 
     while (true) {
@@ -521,17 +631,21 @@ Desteklenmeyen iddiaları çıkar veya belirsiz olduklarını belirt.
             .map(p => p.text)
             .join("");
 
-          if (metin) {
-            biriken += metin;
+          if (metin && !kapandi) {
+            // Hem eski hem yeni ön yüz formatı
 
-            if (!kapandi) {
-              res.write(
-                "data: " + JSON.stringify({ text: metin }) + "\n\n"
-              );
-            }
+            res.write(
+              "data: " +
+              JSON.stringify({
+                t: metin,
+                text: metin
+              }) +
+              "\n\n"
+            );
           }
-        } catch {
-          // Tamamlanmamış SSE satırlarını sonraki okumada işle.
+
+        } catch (error) {
+          console.error("SSE veri okuma hatası:", error.message);
         }
       }
     }
@@ -540,12 +654,13 @@ Desteklenmeyen iddiaları çıkar veya belirsiz olduklarını belirt.
       res.write(
         "data: " +
         JSON.stringify({
+          bitti: true,
           kaynaklar: kaynaklar.map((k, i) => ({
             sira: i + 1,
             baslik: k.title || "Başlıksız",
             url: k.url || "",
             tur: kaynakTuru(k.url || ""),
-            tarih: k.published_date || k.date || ""
+            tarih: k.published_date || ""
           })),
           internetKullanildi: aramaYapildi,
           gelismisArastirma: !!denetimTalimatı
@@ -557,15 +672,18 @@ Desteklenmeyen iddiaları çıkar veya belirsiz olduklarını belirt.
       res.end();
     }
 
-  } catch (hata) {
-    console.error("Chat hatası:", hata);
+  } catch (error) {
+    console.error("Chat API hatası:", error);
 
     if (!kapandi) {
       res.write(
         "data: " +
-        JSON.stringify({ hata: hata.message || "Bir hata oluştu." }) +
+        JSON.stringify({
+          hata: error.message || "Bir hata oluştu."
+        }) +
         "\n\n"
       );
+
       res.end();
     }
   }
@@ -576,7 +694,9 @@ Desteklenmeyen iddiaları çıkar veya belirsiz olduklarını belirt.
 
 app.post("/api/gorsel", async (req, res) => {
   if (!sifreTamam(req.headers["x-sifre"])) {
-    return res.status(401).json({ hata: "Giriş gerekli." });
+    return res.status(401).json({
+      hata: "Giriş gerekli."
+    });
   }
 
   if (!CF_HESAP || !CF_TOKEN) {
@@ -588,10 +708,14 @@ app.post("/api/gorsel", async (req, res) => {
   const { prompt, gorsel, duzenle } = req.body || {};
 
   if (!prompt || typeof prompt !== "string") {
-    return res.status(400).json({ hata: "Görsel açıklaması gerekli." });
+    return res.status(400).json({
+      hata: "Görsel açıklaması gerekli."
+    });
   }
 
-  const model = duzenle ? CF_DUZEN_MODEL : CF_MODEL;
+  const model = duzenle
+    ? CF_DUZEN_MODEL
+    : CF_MODEL;
 
   const endpoint =
     `https://api.cloudflare.com/client/v4/accounts/${CF_HESAP}/ai/run/${model}`;
@@ -599,12 +723,12 @@ app.post("/api/gorsel", async (req, res) => {
   try {
     const body = { prompt };
 
-    if (gorsel && typeof gorsel === "string") {
-      const eslesme = gorsel.match(IMG_RE);
+    if (gorsel) {
+      const eslesme = String(gorsel).match(IMG_RE);
 
       if (!eslesme) {
         return res.status(400).json({
-          hata: "Desteklenmeyen görsel formatı."
+          hata: "Görsel formatı desteklenmiyor."
         });
       }
 
@@ -616,22 +740,22 @@ app.post("/api/gorsel", async (req, res) => {
     const response = await fetch(endpoint, {
       method: "POST",
       headers: {
-        "Authorization": `Bearer ${CF_TOKEN}`,
+        Authorization: `Bearer ${CF_TOKEN}`,
         "Content-Type": "application/json"
       },
       body: JSON.stringify(body)
     });
 
-    const veri = await response.json().catch(() => ({}));
+    const data = await response.json().catch(() => ({}));
 
-    if (!response.ok || !veri.success) {
+    if (!response.ok || !data.success) {
       throw new Error(
-        veri.errors?.[0]?.message ||
+        data.errors?.[0]?.message ||
         "Cloudflare görsel API hatası."
       );
     }
 
-    let sonuc = veri.result;
+    let sonuc = data.result;
 
     if (sonuc && sonuc.image) {
       sonuc = sonuc.image;
@@ -649,18 +773,20 @@ app.post("/api/gorsel", async (req, res) => {
     if (sonuc && sonuc.response) {
       return res.json({
         ok: true,
-        gorsel: "data:image/png;base64," + sonuc.response
+        gorsel:
+          "data:image/png;base64," + sonuc.response
       });
     }
 
-    res.status(500).json({
+    return res.status(500).json({
       hata: "Görsel sonucu beklenen formatta değil."
     });
 
-  } catch (hata) {
-    console.error("Görsel API hatası:", hata);
-    res.status(500).json({
-      hata: hata.message || "Görsel oluşturulamadı."
+  } catch (error) {
+    console.error("Görsel API hatası:", error);
+
+    return res.status(500).json({
+      hata: error.message || "Görsel oluşturulamadı."
     });
   }
 });
@@ -669,6 +795,8 @@ app.post("/api/gorsel", async (req, res) => {
 // SUNUCUYU BAŞLAT
 
 app.listen(PORT, () => {
-  console.log("AbdulGPT sunucusu " + PORT + " portunda çalışıyor.");
+  console.log(
+    "AbdulGPT sunucusu " + PORT + " portunda çalışıyor."
+  );
 });
-    
+                    
