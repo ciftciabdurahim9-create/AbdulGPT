@@ -11,9 +11,13 @@ const MODEL_GUCLU = process.env.MODEL_GUCLU || "gemini-pro-latest";
 
 const CF_HESAP = process.env.CLOUDFLARE_ACCOUNT_ID || "";
 const CF_TOKEN = process.env.CLOUDFLARE_API_TOKEN || "";
-const CF_MODEL = process.env.CF_GORSEL_MODEL || "@cf/black-forest-labs/flux-1-schnell";
-const CF_DUZEN_MODEL = process.env.CF_DUZEN_MODEL || "@cf/black-forest-labs/flux-2-klein-4b";
-const GORSEL_GUNLUK = +process.env.GORSEL_GUNLUK || 200;
+const CF_MODEL =
+  process.env.CF_GORSEL_MODEL ||
+  "@cf/black-forest-labs/flux-1-schnell";
+const CF_DUZEN_MODEL =
+  process.env.CF_DUZEN_MODEL ||
+  "@cf/black-forest-labs/flux-1-kontext-pro";
+const GORSEL_GUNLUK = Number(process.env.GORSEL_GUNLUK) || 200;
 
 const ORTAK =
   " Doğru, net ve dürüst ol; emin olmadığın şeyi uydurma." +
@@ -36,7 +40,8 @@ const HATIRLA =
 
 const SIFRE = process.env.SIFRE || "";
 
-const ozet = x => crypto.createHash("sha256").update(String(x)).digest();
+const ozet = x =>
+  crypto.createHash("sha256").update(String(x)).digest();
 
 const sifreTamam = g =>
   !SIFRE || crypto.timingSafeEqual(ozet(g || ""), ozet(SIFRE));
@@ -80,6 +85,7 @@ function internetGerekli(mesaj) {
   return kaliplar.some(k => k.test(s));
 }
 
+// DURUM
 app.get("/api/durum", (req, res) => {
   res.json({
     sifreli: !!SIFRE,
@@ -258,6 +264,7 @@ app.post("/api/chat", async (req, res) => {
     if (!res.writableEnded) ac.abort();
   });
 
+  // DIŞ TRY
   try {
     const modeller =
       req.body.derin === true
@@ -335,34 +342,35 @@ app.post("/api/chat", async (req, res) => {
     const kaynaklar = new Map();
     const sorgular = new Set();
     const kaynakDestekleri = [];
+
     function groundingIsle(meta) {
       if (!meta) return;
 
       const chunks = meta.groundingChunks || [];
 
-      chunks.forEach((chunk) => {
+      chunks.forEach(chunk => {
         const web = chunk.web;
         if (!web || !web.uri) return;
 
-        const url = web.uri;
+        const kaynakUrl = web.uri;
         const baslik = web.title || "Web kaynağı";
 
-        if (!kaynaklar.has(url)) {
-          kaynaklar.set(url, {
+        if (!kaynaklar.has(kaynakUrl)) {
+          kaynaklar.set(kaynakUrl, {
             baslik,
-            url
+            url: kaynakUrl
           });
         }
       });
 
       if (Array.isArray(meta.webSearchQueries)) {
-        meta.webSearchQueries.forEach((q) => {
+        meta.webSearchQueries.forEach(q => {
           if (q) sorgular.add(q);
         });
       }
 
       if (Array.isArray(meta.groundingSupports)) {
-        meta.groundingSupports.forEach((destek) => {
+        meta.groundingSupports.forEach(destek => {
           kaynakDestekleri.push({
             metin: destek.segment?.text || "",
             kaynakIndeksleri:
@@ -372,6 +380,7 @@ app.post("/api/chat", async (req, res) => {
       }
     }
 
+    // SSE OKUMA
     try {
       while (true) {
         const { value, done } = await reader.read();
@@ -381,7 +390,7 @@ app.post("/api/chat", async (req, res) => {
         buf += dec.decode(value, { stream: true });
         buf = buf.replace(/\r\n/g, "\n");
 
-        let bolumler = buf.split("\n\n");
+        const bolumler = buf.split("\n\n");
         buf = bolumler.pop() || "";
 
         for (const bolum of bolumler) {
@@ -416,8 +425,8 @@ app.post("/api/chat", async (req, res) => {
             const parcalar = aday.content?.parts || [];
 
             const metin = parcalar
-              .filter((p) => p.text && !p.thought)
-              .map((p) => p.text)
+              .filter(p => p.text && !p.thought)
+              .map(p => p.text)
               .join("");
 
             if (metin) {
@@ -431,6 +440,7 @@ app.post("/api/chat", async (req, res) => {
         }
       }
 
+      // SON KALAN VERİ
       if (buf.trim()) {
         const satirlar = buf.split("\n");
 
@@ -450,8 +460,8 @@ app.post("/api/chat", async (req, res) => {
             const parcalar = aday.content?.parts || [];
 
             const metin = parcalar
-              .filter((p) => p.text && !p.thought)
-              .map((p) => p.text)
+              .filter(p => p.text && !p.thought)
+              .map(p => p.text)
               .join("");
 
             if (metin) {
@@ -488,10 +498,26 @@ app.post("/api/chat", async (req, res) => {
         hata: "Yanıt oluşturulurken bir hata oluştu."
       });
 
+      if (!res.writableEnded) {
+        res.end();
+      }
+    }
+
+  } catch (err) {
+    // DIŞ TRY İÇİN EKSİK OLAN CATCH
+    console.error("Chat API hatası:", err);
+
+    if (!res.headersSent) {
+      return res.status(502).json({
+        hata: "AbdulGPT yanıt oluşturamadı: " + err.message
+      });
+    }
+
+    if (!res.writableEnded) {
       res.end();
     }
   }
-);
+});
 
 
 // =====================================================
@@ -511,13 +537,11 @@ async function gorselIstemi(istem, signal, resim) {
     gorselSayac.adet = 0;
   }
 
-  if (gorselSayac.adet >= 30) {
+  if (gorselSayac.adet >= GORSEL_GUNLUK) {
     throw new Error("Günlük görsel oluşturma sınırına ulaşıldı.");
   }
 
-  const model = resim
-    ? "@cf/black-forest-labs/flux-1-kontext-pro"
-    : "@cf/black-forest-labs/flux-1-schnell";
+  const model = resim ? CF_DUZEN_MODEL : CF_MODEL;
 
   const inputs = {
     prompt: istem
@@ -527,10 +551,10 @@ async function gorselIstemi(istem, signal, resim) {
     inputs.image = resim;
   }
 
-  const url =
+  const apiUrl =
     `https://api.cloudflare.com/client/v4/accounts/${CF_HESAP}/ai/run/${model}`;
 
-  const response = await fetch(url, {
+  const response = await fetch(apiUrl, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${CF_TOKEN}`,
@@ -547,18 +571,14 @@ async function gorselIstemi(istem, signal, resim) {
 
   gorselSayac.adet++;
 
-  const sonuc = await response.json();
-
-  return sonuc;
+  return await response.json();
 }
 
 
+// GÖRSEL API
 app.post("/api/gorsel", async (req, res) => {
   try {
-    const {
-      prompt,
-      image
-    } = req.body || {};
+    const { prompt, image } = req.body || {};
 
     if (!prompt || typeof prompt !== "string") {
       return res.status(400).json({
