@@ -24,6 +24,27 @@ const CF_DUZEN_MODEL =
 
 const GORSEL_GUNLUK = Number(process.env.GORSEL_GUNLUK) || 200;
 
+
+// =====================================================
+// GÜNCEL TARİH VE SAAT - TÜRKİYE
+// =====================================================
+
+function turkiyeZamani() {
+  const simdi = new Date();
+
+  return new Intl.DateTimeFormat("tr-TR", {
+    timeZone: "Europe/Istanbul",
+    weekday: "long",
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hourCycle: "h23"
+  }).format(simdi);
+}
+
 const ORTAK =
   " Doğru, net ve dürüst ol; emin olmadığın şeyi uydurma." +
   " Güncel bilgi gerekiyorsa internet araması yap." +
@@ -64,7 +85,11 @@ function limitKontrol(key, max = 10) {
   return n <= max;
 }
 
+
+// =====================================================
 // OTOMATİK İNTERNET ARAMASI
+// =====================================================
+
 function internetGerekli(mesaj) {
   const s = mesaj.toLocaleLowerCase("tr-TR");
 
@@ -90,18 +115,28 @@ function internetGerekli(mesaj) {
   return kaliplar.some(k => k.test(s));
 }
 
+
+// =====================================================
 // DURUM
+// =====================================================
+
 app.get("/api/durum", (req, res) => {
   res.json({
     sifreli: !!SIFRE,
     internetArama: !!TAVILY_API_KEY,
     googleSearch: false,
     tavilySearch: !!TAVILY_API_KEY,
-    gorsel: !!CF_HESAP && !!CF_TOKEN
+    gorsel: !!CF_HESAP && !!CF_TOKEN,
+    tarih: turkiyeZamani(),
+    saatDilimi: "Europe/Istanbul"
   });
 });
 
+
+// =====================================================
 // GİRİŞ
+// =====================================================
+
 app.post("/api/giris", (req, res) => {
   const k = "g" + (req.headers["x-forwarded-for"] || req.ip);
 
@@ -118,13 +153,18 @@ app.post("/api/giris", (req, res) => {
   res.status(401).json({ hata: "Şifre yanlış." });
 });
 
+
 const IMG_RE =
   /^data:(image\/(?:jpeg|png|webp));base64,([A-Za-z0-9+\/=]+)$/;
 
 const url = m =>
   `https://generativelanguage.googleapis.com/v1beta/models/${m}:streamGenerateContent?alt=sse`;
 
+
+// =====================================================
 // ABDULGPT CHAT + TAVILY İNTERNET ARAMASI
+// =====================================================
+
 app.post("/api/chat", async (req, res) => {
   if (!API_KEY) {
     return res.status(500).json({
@@ -220,7 +260,16 @@ app.post("/api/chat", async (req, res) => {
       ? req.body.profil.slice(0, 1200).replace(/\s*\n\s*/g, "; ")
       : "";
 
+  // HER İSTEKTE GÜNCEL TÜRKİYE TARİHİ VE SAATİ
+  const guncelZaman = turkiyeZamani();
+
   const sistem =
+    "GÜNCEL TARİH VE SAAT: " + guncelZaman + ". " +
+    "Saat dilimi Europe/Istanbul, Türkiye saatidir. " +
+    "Bugünün tarihini ve saatini bu bilgiye göre kabul et. " +
+    "Tarih veya saat sorulursa bu bilgiyi kullan. " +
+    "Eski tarihleri bugünün tarihi olarak söyleme. " +
+    "Zamanın ilerlediğini unutma; sabit tarih kullanma. " +
     (MODLAR[mod] || MODLAR.genel) +
     ORTAK +
     (mod === "ders" ? "" : LATEXSIZ) +
@@ -260,7 +309,11 @@ app.post("/api/chat", async (req, res) => {
     req.body.ara === true ||
     internetGerekli(sonMesaj);
 
+
+  // =====================================================
   // TAVILY İNTERNET ARAMASI
+  // =====================================================
+
   let tavilySonuclari = [];
 
   if (ara) {
@@ -336,13 +389,18 @@ URL: ${kaynak.url || ""}
     }
   }
 
+
   const ac = new AbortController();
 
   res.on("close", () => {
     if (!res.writableEnded) ac.abort();
   });
 
-  // DIŞ TRY
+
+  // =====================================================
+  // GEMINI MODEL İSTEĞİ
+  // =====================================================
+
   try {
     const modeller =
       req.body.derin === true
@@ -422,7 +480,9 @@ URL: ${kaynak.url || ""}
     const sorgular = new Set();
     const kaynakDestekleri = [];
 
+
     // TAVILY KAYNAKLARINI EKLE
+
     tavilySonuclari.forEach(kaynak => {
       if (!kaynak.url) return;
 
@@ -436,7 +496,9 @@ URL: ${kaynak.url || ""}
       sorgular.add(sonMesaj);
     }
 
+
     // GEMINI GROUNDING KAYNAKLARI
+
     function groundingIsle(meta) {
       if (!meta) return;
 
@@ -474,7 +536,9 @@ URL: ${kaynak.url || ""}
       }
     }
 
+
     // SSE OKUMA
+
     try {
       while (true) {
         const { value, done } = await reader.read();
@@ -534,7 +598,9 @@ URL: ${kaynak.url || ""}
         }
       }
 
+
       // SON KALAN VERİ
+
       if (buf.trim()) {
         const satirlar = buf.split("\n");
 
@@ -668,7 +734,10 @@ async function gorselIstemi(istem, signal, resim) {
 }
 
 
+// =====================================================
 // GÖRSEL API
+// =====================================================
+
 app.post("/api/gorsel", async (req, res) => {
   try {
     const { prompt, image } = req.body || {};
@@ -709,4 +778,5 @@ app.post("/api/gorsel", async (req, res) => {
 
 app.listen(PORT, () => {
   console.log(`AbdulGPT sunucusu ${PORT} portunda çalışıyor.`);
+  console.log("Türkiye saati:", turkiyeZamani());
 });
