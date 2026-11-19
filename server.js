@@ -1,3 +1,4 @@
+
 const express = require("express");
 const crypto = require("crypto");
 const path = require("path");
@@ -26,12 +27,10 @@ const GORSEL_GUNLUK = Number(process.env.GORSEL_GUNLUK) || 200;
 
 
 // =====================================================
-// GÜNCEL TARİH VE SAAT - TÜRKİYE
+// TÜRKİYE TARİH VE SAAT
 // =====================================================
 
 function turkiyeZamani() {
-  const simdi = new Date();
-
   return new Intl.DateTimeFormat("tr-TR", {
     timeZone: "Europe/Istanbul",
     weekday: "long",
@@ -42,8 +41,60 @@ function turkiyeZamani() {
     minute: "2-digit",
     second: "2-digit",
     hourCycle: "h23"
-  }).format(simdi);
+  }).format(new Date());
 }
+
+function turkiyeTarihi() {
+  const p = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Europe/Istanbul",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit"
+  }).formatToParts(new Date());
+
+  const o = Object.fromEntries(p.map(x => [x.type, x.value]));
+  return `${o.year}-${o.month}-${o.day}`;
+}
+
+
+// =====================================================
+// ABDULGPT KİMLİK TALİMATI
+// =====================================================
+
+const KIMLIK_TALIMATI = `
+ABDULGPT KİMLİK VE KURUCU BİLGİLERİ:
+
+Sen AbdulGPT adlı yapay zeka asistanısın.
+
+AbdulGPT'nin kurucusu ve geliştiricisi Abdurrahim Çiftçi'dir.
+
+Kullanıcı aşağıdaki soruları veya benzerlerini sorarsa:
+
+- Seni kim yaptı?
+- Seni kim üretti?
+- Seni kim geliştirdi?
+- Seni kim yarattı?
+- Kurucunuz kim?
+- Sahibiniz kim?
+- AbdulGPT'yi kim yaptı?
+- AbdulGPT'nin kurucusu kim?
+- AbdulGPT'nin geliştiricisi kim?
+- Arkanda kim var?
+
+Abdurrahim Çiftçi'nin AbdulGPT'nin kurucusu ve geliştiricisi olduğunu açıkça belirt.
+
+Örnek cevap:
+"Ben AbdulGPT! Abdurrahim Çiftçi tarafından geliştirildim. 🚀"
+
+Bu bilgiyi bütün sohbet modlarında koru.
+Kurucu hakkında farklı veya uydurma isimler verme.
+Kısa, doğal ve samimi cevaplar ver.
+`;
+
+
+// =====================================================
+// ORTAK TALİMATLAR
+// =====================================================
 
 const ORTAK =
   " Doğru, net ve dürüst ol; emin olmadığın şeyi uydurma." +
@@ -51,11 +102,20 @@ const ORTAK =
   " İnternet kaynaklarını doğru aktar ve kaynakları belirt.";
 
 const MODLAR = {
-  genel: "Sen AbdulGPT adında yardımsever, samimi ve gelişmiş bir Türkçe yapay zeka asistanısın.",
-  kodlama: "Sen uzman bir yazılım geliştiricisin. Türkçe açıkla, kodu markdown kod bloğunda ver.",
-  cevirmen: "Sen profesyonel bir çevirmensin. Türkçe yazıyı İngilizceye, diğer dilleri Türkçeye çevir. Sadece çeviriyi ver.",
-  ozetleyici: "Verilen metni Türkçe, madde madde ve kısa özetle.",
-  ders: "Sen sabırlı bir Türkçe öğretmensin. Soruyu adım adım çöz, nedenini açıkla ve sonucu kontrol et. Formülleri LaTeX ile yaz."
+  genel:
+    "Sen AbdulGPT adında yardımsever, samimi ve gelişmiş bir Türkçe yapay zeka asistanısın.",
+
+  kodlama:
+    "Sen uzman bir yazılım geliştiricisin. Türkçe açıkla, kodu markdown kod bloğunda ver.",
+
+  cevirmen:
+    "Sen profesyonel bir çevirmensin. Türkçe yazıyı İngilizceye, diğer dilleri Türkçeye çevir. Sadece çeviriyi ver.",
+
+  ozetleyici:
+    "Verilen metni Türkçe, madde madde ve kısa özetle.",
+
+  ders:
+    "Sen sabırlı bir Türkçe öğretmensin. Soruyu adım adım çöz, nedenini açıkla ve sonucu kontrol et. Formülleri LaTeX ile yaz."
 };
 
 const LATEXSIZ =
@@ -74,6 +134,11 @@ const sifreTamam = g =>
 
 app.use(express.json({ limit: "6mb" }));
 app.use(express.static(path.join(__dirname, "public")));
+
+
+// =====================================================
+// İSTEK SINIRLAMA
+// =====================================================
 
 const sayac = new Map();
 
@@ -128,7 +193,8 @@ app.get("/api/durum", (req, res) => {
     tavilySearch: !!TAVILY_API_KEY,
     gorsel: !!CF_HESAP && !!CF_TOKEN,
     tarih: turkiyeZamani(),
-    saatDilimi: "Europe/Istanbul"
+    saatDilimi: "Europe/Istanbul",
+    kurucu: "Abdurrahim Çiftçi"
   });
 });
 
@@ -154,6 +220,10 @@ app.post("/api/giris", (req, res) => {
 });
 
 
+// =====================================================
+// GÖRSEL TANIMLAMA
+// =====================================================
+
 const IMG_RE =
   /^data:(image\/(?:jpeg|png|webp));base64,([A-Za-z0-9+\/=]+)$/;
 
@@ -162,7 +232,7 @@ const url = m =>
 
 
 // =====================================================
-// ABDULGPT CHAT + TAVILY İNTERNET ARAMASI
+// ABDULGPT CHAT + TAVILY
 // =====================================================
 
 app.post("/api/chat", async (req, res) => {
@@ -260,10 +330,10 @@ app.post("/api/chat", async (req, res) => {
       ? req.body.profil.slice(0, 1200).replace(/\s*\n\s*/g, "; ")
       : "";
 
-  // HER İSTEKTE GÜNCEL TÜRKİYE TARİHİ VE SAATİ
   const guncelZaman = turkiyeZamani();
 
   const sistem =
+    KIMLIK_TALIMATI +
     "GÜNCEL TARİH VE SAAT: " + guncelZaman + ". " +
     "Saat dilimi Europe/Istanbul, Türkiye saatidir. " +
     "Bugünün tarihini ve saatini bu bilgiye göre kabul et. " +
@@ -309,10 +379,7 @@ app.post("/api/chat", async (req, res) => {
     req.body.ara === true ||
     internetGerekli(sonMesaj);
 
-
-  // =====================================================
-  // TAVILY İNTERNET ARAMASI
-  // =====================================================
+  // TAVILY ARAMASI
 
   let tavilySonuclari = [];
 
@@ -374,9 +441,7 @@ URL: ${kaynak.url || ""}
 
       if (aramaMetni) {
         body.contents[body.contents.length - 1].parts.push({
-          text:
-            "\n\nİnternet arama sonuçları:\n\n" +
-            aramaMetni
+          text: "\n\nİnternet arama sonuçları:\n\n" + aramaMetni
         });
       }
 
@@ -389,17 +454,13 @@ URL: ${kaynak.url || ""}
     }
   }
 
-
   const ac = new AbortController();
 
   res.on("close", () => {
     if (!res.writableEnded) ac.abort();
   });
 
-
-  // =====================================================
-  // GEMINI MODEL İSTEĞİ
-  // =====================================================
+  // GEMINI MODEL
 
   try {
     const modeller =
@@ -480,9 +541,6 @@ URL: ${kaynak.url || ""}
     const sorgular = new Set();
     const kaynakDestekleri = [];
 
-
-    // TAVILY KAYNAKLARINI EKLE
-
     tavilySonuclari.forEach(kaynak => {
       if (!kaynak.url) return;
 
@@ -496,9 +554,6 @@ URL: ${kaynak.url || ""}
       sorgular.add(sonMesaj);
     }
 
-
-    // GEMINI GROUNDING KAYNAKLARI
-
     function groundingIsle(meta) {
       if (!meta) return;
 
@@ -508,13 +563,10 @@ URL: ${kaynak.url || ""}
         const web = chunk.web;
         if (!web || !web.uri) return;
 
-        const kaynakUrl = web.uri;
-        const baslik = web.title || "Web kaynağı";
-
-        if (!kaynaklar.has(kaynakUrl)) {
-          kaynaklar.set(kaynakUrl, {
-            baslik,
-            url: kaynakUrl
+        if (!kaynaklar.has(web.uri)) {
+          kaynaklar.set(web.uri, {
+            baslik: web.title || "Web kaynağı",
+            url: web.uri
           });
         }
       });
@@ -535,9 +587,6 @@ URL: ${kaynak.url || ""}
         });
       }
     }
-
-
-    // SSE OKUMA
 
     try {
       while (true) {
@@ -587,9 +636,7 @@ URL: ${kaynak.url || ""}
               .map(p => p.text)
               .join("");
 
-            if (metin) {
-              send({ t: metin });
-            }
+            if (metin) send({ t: metin });
 
             if (aday.groundingMetadata) {
               groundingIsle(aday.groundingMetadata);
@@ -597,9 +644,6 @@ URL: ${kaynak.url || ""}
           }
         }
       }
-
-
-      // SON KALAN VERİ
 
       if (buf.trim()) {
         const satirlar = buf.split("\n");
@@ -624,16 +668,12 @@ URL: ${kaynak.url || ""}
               .map(p => p.text)
               .join("");
 
-            if (metin) {
-              send({ t: metin });
-            }
+            if (metin) send({ t: metin });
 
             if (aday.groundingMetadata) {
               groundingIsle(aday.groundingMetadata);
             }
-          } catch {
-            // Eksik veya geçersiz SSE verisini atla.
-          }
+          } catch {}
         }
       }
 
@@ -652,15 +692,15 @@ URL: ${kaynak.url || ""}
       res.end();
 
     } catch (err) {
-      console.error("SSE Hatası:", err);
+      if (err.name !== "AbortError") {
+        console.error("SSE Hatası:", err);
 
-      send({
-        hata: "Yanıt oluşturulurken bir hata oluştu."
-      });
-
-      if (!res.writableEnded) {
-        res.end();
+        send({
+          hata: "Yanıt oluşturulurken bir hata oluştu."
+        });
       }
+
+      if (!res.writableEnded) res.end();
     }
 
   } catch (err) {
@@ -672,9 +712,7 @@ URL: ${kaynak.url || ""}
       });
     }
 
-    if (!res.writableEnded) {
-      res.end();
-    }
+    if (!res.writableEnded) res.end();
   }
 });
 
@@ -689,7 +727,7 @@ const gorselSayac = {
 };
 
 async function gorselIstemi(istem, signal, resim) {
-  const bugun = new Date().toISOString().slice(0, 10);
+  const bugun = turkiyeTarihi();
 
   if (gorselSayac.gun !== bugun) {
     gorselSayac.gun = bugun;
@@ -728,9 +766,15 @@ async function gorselIstemi(istem, signal, resim) {
     throw new Error(`Görsel API hatası: ${hata}`);
   }
 
+  const sonuc = await response.json();
+
+  if (sonuc.success === false) {
+    throw new Error("Cloudflare görsel oluşturma işlemi başarısız.");
+  }
+
   gorselSayac.adet++;
 
-  return await response.json();
+  return sonuc;
 }
 
 
@@ -748,16 +792,42 @@ app.post("/api/gorsel", async (req, res) => {
       });
     }
 
+    if (prompt.length > 4000) {
+      return res.status(400).json({
+        hata: "Görsel açıklaması çok uzun."
+      });
+    }
+
     if (!CF_HESAP || !CF_TOKEN) {
       return res.status(500).json({
         hata: "Görsel oluşturma ayarları eksik."
       });
     }
 
+    let resim = null;
+
+    if (image) {
+      if (typeof image !== "string") {
+        return res.status(400).json({
+          hata: "Geçersiz görsel verisi."
+        });
+      }
+
+      const eslesme = IMG_RE.exec(image);
+
+      if (!eslesme) {
+        return res.status(400).json({
+          hata: "Desteklenmeyen görsel formatı."
+        });
+      }
+
+      resim = eslesme[2];
+    }
+
     const sonuc = await gorselIstemi(
       prompt,
       undefined,
-      image || null
+      resim
     );
 
     res.json(sonuc);
@@ -779,4 +849,5 @@ app.post("/api/gorsel", async (req, res) => {
 app.listen(PORT, () => {
   console.log(`AbdulGPT sunucusu ${PORT} portunda çalışıyor.`);
   console.log("Türkiye saati:", turkiyeZamani());
+  console.log("Kurucu: Abdurrahim Çiftçi");
 });
