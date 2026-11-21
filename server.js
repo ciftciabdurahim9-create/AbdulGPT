@@ -2,7 +2,6 @@
 const express = require("express");
 const crypto = require("crypto");
 const path = require("path");
-const nodemailer = require("nodemailer");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -22,24 +21,14 @@ const CF_DUZEN_MODEL = process.env.CF_DUZEN_MODEL || "@cf/black-forest-labs/flux
 const GORSEL_GUNLUK = Number(process.env.GORSEL_GUNLUK) || 200;
 
 // =====================================================
-// E-POSTA AYARLARI
+// E-POSTA AYARLARI - RESEND API
 // =====================================================
 
-const MAIL_USER = process.env.MAIL_USER || "";
-const MAIL_PASS = process.env.MAIL_PASS || "";
+const RESEND_API_KEY = process.env.RESEND_API_KEY || "";
 const MAIL_TO = "ciftciabdurahim1@gmail.com";
 
-const mailer = MAIL_USER && MAIL_PASS
-  ? nodemailer.createTransport({
-      host: "smtp.gmail.com",
-      port: 465,
-      secure: true,
-      auth: {
-        user: MAIL_USER,
-        pass: MAIL_PASS
-      }
-    })
-  : null;
+const RESEND_FROM =
+  process.env.RESEND_FROM || "AbdulGPT <onboarding@resend.dev>";
 
 // =====================================================
 // TÜRKİYE TARİH VE SAAT
@@ -217,7 +206,7 @@ app.get("/api/durum", (req, res) => {
     googleSearch: false,
     tavilySearch: !!TAVILY_API_KEY,
     gorsel: !!CF_HESAP && !!CF_TOKEN,
-    eposta: !!mailer,
+    eposta: !!RESEND_API_KEY,
     tarih: turkiyeZamani(),
     saatDilimi: "Europe/Istanbul",
     kurucu: "Abdurrahim Çiftçi"
@@ -831,14 +820,14 @@ app.post("/api/gorsel", async (req, res) => {
 });
 
 // =====================================================
-// ÖNERİ VE İSTEK E-POSTA API
+// ÖNERİ VE İSTEK E-POSTA API - RESEND
 // =====================================================
 
 app.post("/api/oneriler", async (req, res) => {
   try {
-    if (!mailer) {
+    if (!RESEND_API_KEY) {
       return res.status(503).json({
-        hata: "E-posta sistemi henüz yapılandırılmadı."
+        hata: "E-posta sistemi yapılandırılmadı."
       });
     }
 
@@ -883,12 +872,7 @@ app.post("/api/oneriler", async (req, res) => {
       });
     }
 
-    await mailer.sendMail({
-      from: `"AbdulGPT" <${MAIL_USER}>`,
-      to: MAIL_TO,
-      replyTo: email || MAIL_USER,
-      subject: `AbdulGPT - ${konu}`,
-      text:
+    const epostaMetni =
 `ABDULGPT ÖNERİ VE İSTEK BİLDİRİMİ
 
 Gönderen: ${ad}
@@ -900,13 +884,46 @@ MESAJ:
 ${mesaj}
 
 Gönderim zamanı: ${turkiyeZamani()}
-`
-    });
+`;
+
+    const yanit = await fetch(
+      "https://api.resend.com/emails",
+      {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${RESEND_API_KEY}`,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          from: RESEND_FROM,
+          to: [MAIL_TO],
+          ...(email ? { reply_to: email } : {}),
+          subject: `AbdulGPT - ${konu}`,
+          text: epostaMetni
+        })
+      }
+    );
+
+    const sonuc = await yanit.json().catch(() => ({}));
+
+    if (!yanit.ok) {
+      console.error("Resend API hatası:", sonuc);
+
+      return res.status(502).json({
+        hata:
+          sonuc.message ||
+          sonuc.name ||
+          "E-posta gönderilemedi."
+      });
+    }
+
+    console.log("Öneri e-postası gönderildi:", sonuc.id);
 
     return res.json({
       ok: true,
       mesaj: "Mesajın başarıyla gönderildi. Teşekkür ederiz!"
     });
+
   } catch (err) {
     console.error("Öneri e-posta hatası:", err);
 
@@ -924,5 +941,8 @@ app.listen(PORT, () => {
   console.log(`AbdulGPT sunucusu ${PORT} portunda çalışıyor.`);
   console.log("Türkiye saati:", turkiyeZamani());
   console.log("Kurucu: Abdurrahim Çiftçi");
-  console.log("E-posta sistemi:", mailer ? "Hazır" : "Yapılandırılmadı");
+  console.log(
+    "E-posta sistemi:",
+    RESEND_API_KEY ? "Resend hazır" : "Yapılandırılmadı"
+  );
 });
