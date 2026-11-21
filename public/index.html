@@ -558,10 +558,10 @@ $("geriBildirimForm").addEventListener("submit", async e => {
   gonder.disabled = true; gonder.textContent = "Gönderiliyor…";
   durum.textContent = "Mesajın iletiliyor…";
   try {
-    const yanit = await fetch("/api/geri-bildirim", {
+    const yanit = await fetch("/api/oneriler", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ tur, mesaj })
+      body: JSON.stringify({ konu: tur, mesaj })
     });
     const veri = await yanit.json().catch(() => ({}));
     if (!yanit.ok || !veri.ok) throw new Error(veri.hata || "Mesaj gönderilemedi. Lütfen tekrar dene.");
