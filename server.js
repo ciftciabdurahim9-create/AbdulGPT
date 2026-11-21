@@ -2,6 +2,7 @@
 const express = require("express");
 const crypto = require("crypto");
 const path = require("path");
+const nodemailer = require("nodemailer");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -15,16 +16,30 @@ const MODEL_GUCLU = process.env.MODEL_GUCLU || "gemini-pro-latest";
 const CF_HESAP = process.env.CLOUDFLARE_ACCOUNT_ID || "";
 const CF_TOKEN = process.env.CLOUDFLARE_API_TOKEN || "";
 
-const CF_MODEL =
-  process.env.CF_GORSEL_MODEL ||
-  "@cf/black-forest-labs/flux-1-schnell";
-
-const CF_DUZEN_MODEL =
-  process.env.CF_DUZEN_MODEL ||
-  "@cf/black-forest-labs/flux-1-kontext-pro";
+const CF_MODEL = process.env.CF_GORSEL_MODEL || "@cf/black-forest-labs/flux-1-schnell";
+const CF_DUZEN_MODEL = process.env.CF_DUZEN_MODEL || "@cf/black-forest-labs/flux-1-kontext-pro";
 
 const GORSEL_GUNLUK = Number(process.env.GORSEL_GUNLUK) || 200;
 
+// =====================================================
+// E-POSTA AYARLARI
+// =====================================================
+
+const MAIL_USER = process.env.MAIL_USER || "";
+const MAIL_PASS = process.env.MAIL_PASS || "";
+const MAIL_TO = "ciftciabdurahim1@gmail.com";
+
+const mailer = MAIL_USER && MAIL_PASS
+  ? nodemailer.createTransport({
+      host: "smtp.gmail.com",
+      port: 465,
+      secure: true,
+      auth: {
+        user: MAIL_USER,
+        pass: MAIL_PASS
+      }
+    })
+  : null;
 
 // =====================================================
 // TÜRKİYE TARİH VE SAAT
@@ -53,10 +68,8 @@ function turkiyeTarihi() {
   }).formatToParts(new Date());
 
   const o = Object.fromEntries(p.map(x => [x.type, x.value]));
-
   return `${o.year}-${o.month}-${o.day}`;
 }
-
 
 // =====================================================
 // ABDULGPT KURUCU BİLGİ BANKASI
@@ -66,32 +79,25 @@ const KIMLIK_TALIMATI = `
 ABDULGPT KİMLİK VE KURUCU BİLGİ BANKASI
 
 PROJE BİLGİLERİ:
-
 - Projenin adı AbdulGPT'dir.
 - Resmî internet sitesi: https://abdulgpt.com.tr
 - AbdulGPT, Türkçe odaklı bir yapay zeka asistanı projesidir.
-- AbdulGPT'nin amacı insanlara yardımcı olmak ve yapay zekayı herkes için erişilebilir hale getirmektir.
+- Amacı insanlara yardımcı olmak ve yapay zekayı herkes için erişilebilir hale getirmektir.
 
 KURUCU BİLGİLERİ:
-
 - Adı: Abdurrahim Çiftçi.
 - Görevi: AbdulGPT'nin kurucusu, geliştiricisi ve proje sahibi.
 - Kuruluş dönemindeki yaşı: 16.
 - AbdulGPT projesini geliştiren kişidir.
 
 KURULUŞ HİKÂYESİ:
-
 Abdurrahim Çiftçi, AbdulGPT'yi yerli bir yapay zeka oluşturmak ve bu projeyi gelecekte daha ileri seviyelere taşımak amacıyla geliştirmeye başlamıştır.
 
-AbdulGPT, sürekli geliştirilmesi hedeflenen bir yapay zeka projesidir.
-
 PROJENİN HEDEFLERİ:
-
 - Herkesin kullanabileceği ücretsiz bir yapay zeka geliştirmek.
 - AbdulGPT'yi sürekli geliştirmek.
 - Türkiye'den çıkan başarılı bir yapay zeka projesi oluşturmak.
-- Kullanıcılara kaliteli, güvenilir ve kolay erişilebilir bir yapay zeka deneyimi sunmak.
-- Yapay zekayı daha fazla insanın kullanımına sunmak.
+- Kaliteli, güvenilir ve kolay erişilebilir bir deneyim sunmak.
 
 SORU VE CEVAP REHBERİ:
 
@@ -102,7 +108,7 @@ Kullanıcı "Kurucunuz kim?" diye sorarsa:
 "Kurucum, geliştiricim ve proje sahibim Abdurrahim Çiftçi'dir."
 
 Kullanıcı "Abdurrahim Çiftçi kimdir?" diye sorarsa:
-"Abdurrahim Çiftçi, AbdulGPT'nin kurucusu, geliştiricisi ve proje sahibidir. Yerli bir yapay zeka oluşturmak ve bu projeyi geleceğe taşımak amacıyla AbdulGPT'yi geliştirmektedir."
+"Abdurrahim Çiftçi, AbdulGPT'nin kurucusu, geliştiricisi ve proje sahibidir."
 
 Kullanıcı "AbdulGPT neden kuruldu?" diye sorarsa:
 "AbdulGPT, yerli bir yapay zeka oluşturmak ve onu sürekli geliştirerek daha ileriye taşımak amacıyla kuruldu."
@@ -110,24 +116,18 @@ Kullanıcı "AbdulGPT neden kuruldu?" diye sorarsa:
 Kullanıcı "AbdulGPT'nin amacı nedir?" diye sorarsa:
 "Herkesin kullanabileceği ücretsiz, kaliteli ve erişilebilir bir yapay zeka sunmak."
 
-Kullanıcı "AbdulGPT'nin hedefi nedir?" diye sorarsa:
-"Türkiye'den çıkan başarılı bir yapay zeka projesi olmak ve yapay zekayı herkes için erişilebilir hale getirmek."
-
 Kullanıcı "AbdulGPT'nin sitesi nedir?" diye sorarsa:
 "AbdulGPT'nin resmî internet sitesi https://abdulgpt.com.tr adresidir."
 
 ÖNEMLİ KURALLAR:
-
 1. Bu bilgileri bütün sohbet modlarında koru.
-2. Kurucu ve proje hakkında sorular sorulduğunda bu bilgi bankasını kullan.
-3. Kurucunun hakkında bilinmeyen bilgileri uydurma.
+2. Kurucu ve proje hakkındaki sorularda bu bilgi bankasını kullan.
+3. Bilinmeyen bilgileri uydurma.
 4. Kurucunun özel bilgilerini gereksiz yere paylaşma.
-5. Kurucunun yaşı kuruluş döneminde 16 olarak belirtilmiştir. Güncel yaşı doğrulanmadan kesin bir güncel yaş iddiasında bulunma.
-6. Kurucu hakkında aşağılayıcı veya yanlış bilgiler üretme.
-7. AbdulGPT'nin başka bir kişi tarafından kurulduğunu iddia etme.
-8. Cevaplarını doğal, samimi ve anlaşılır Türkçeyle oluştur.
+5. Kurucunun yaşı kuruluş döneminde 16 olarak belirtilmiştir. Güncel yaşı doğrulanmadan kesin yaş iddiasında bulunma.
+6. AbdulGPT'nin başka bir kişi tarafından kurulduğunu iddia etme.
+7. Doğal ve anlaşılır Türkçe kullan.
 `;
-
 
 // =====================================================
 // ORTAK TALİMATLAR
@@ -139,20 +139,11 @@ const ORTAK =
   " İnternet kaynaklarını doğru aktar ve kaynakları belirt.";
 
 const MODLAR = {
-  genel:
-    "Sen AbdulGPT adında yardımsever, samimi ve gelişmiş bir Türkçe yapay zeka asistanısın.",
-
-  kodlama:
-    "Sen uzman bir yazılım geliştiricisin. Türkçe açıkla, kodu markdown kod bloğunda ver.",
-
-  cevirmen:
-    "Sen profesyonel bir çevirmensin. Türkçe yazıyı İngilizceye, diğer dilleri Türkçeye çevir. Sadece çeviriyi ver.",
-
-  ozetleyici:
-    "Verilen metni Türkçe, madde madde ve kısa özetle.",
-
-  ders:
-    "Sen sabırlı bir Türkçe öğretmensin. Soruyu adım adım çöz, nedenini açıkla ve sonucu kontrol et. Formülleri LaTeX ile yaz."
+  genel: "Sen AbdulGPT adında yardımsever, samimi ve gelişmiş bir Türkçe yapay zeka asistanısın.",
+  kodlama: "Sen uzman bir yazılım geliştiricisin. Türkçe açıkla, kodu markdown kod bloğunda ver.",
+  cevirmen: "Sen profesyonel bir çevirmensin. Türkçe yazıyı İngilizceye, diğer dilleri Türkçeye çevir. Sadece çeviriyi ver.",
+  ozetleyici: "Verilen metni Türkçe, madde madde ve kısa özetle.",
+  ders: "Sen sabırlı bir Türkçe öğretmensin. Soruyu adım adım çöz, nedenini açıkla ve sonucu kontrol et. Formülleri LaTeX ile yaz."
 };
 
 const LATEXSIZ =
@@ -172,7 +163,6 @@ const sifreTamam = g =>
 app.use(express.json({ limit: "6mb" }));
 app.use(express.static(path.join(__dirname, "public")));
 
-
 // =====================================================
 // İSTEK SINIRLAMA
 // =====================================================
@@ -186,7 +176,6 @@ function limitKontrol(key, max = 10) {
   sayac.set(key, n);
   return n <= max;
 }
-
 
 // =====================================================
 // OTOMATİK İNTERNET ARAMASI
@@ -217,7 +206,6 @@ function internetGerekli(mesaj) {
   return kaliplar.some(k => k.test(s));
 }
 
-
 // =====================================================
 // DURUM
 // =====================================================
@@ -229,12 +217,12 @@ app.get("/api/durum", (req, res) => {
     googleSearch: false,
     tavilySearch: !!TAVILY_API_KEY,
     gorsel: !!CF_HESAP && !!CF_TOKEN,
+    eposta: !!mailer,
     tarih: turkiyeZamani(),
     saatDilimi: "Europe/Istanbul",
     kurucu: "Abdurrahim Çiftçi"
   });
 });
-
 
 // =====================================================
 // GİRİŞ
@@ -256,7 +244,6 @@ app.post("/api/giris", (req, res) => {
   res.status(401).json({ hata: "Şifre yanlış." });
 });
 
-
 // =====================================================
 // GÖRSEL TANIMLAMA
 // =====================================================
@@ -266,7 +253,6 @@ const IMG_RE =
 
 const url = m =>
   `https://generativelanguage.googleapis.com/v1beta/models/${m}:streamGenerateContent?alt=sse`;
-
 
 // =====================================================
 // ABDULGPT CHAT + TAVILY
@@ -381,15 +367,12 @@ app.post("/api/chat", async (req, res) => {
     ORTAK +
     (mod === "ders" ? "" : LATEXSIZ) +
     HATIRLA +
-    (profil
-      ? " Kullanıcı hakkında bildiklerin: " + profil
-      : "");
+    (profil ? " Kullanıcı hakkında bildiklerin: " + profil : "");
 
   const body = {
     systemInstruction: {
       parts: [{ text: sistem }]
     },
-
     contents: messages.map(m => {
       const parts = [
         { text: m.content.trim() || "Bu resmi anlat." }
@@ -404,18 +387,13 @@ app.post("/api/chat", async (req, res) => {
         parts
       };
     }),
-
     generationConfig: {
       maxOutputTokens: 4000
     }
   };
 
   const sonMesaj = messages[messages.length - 1].content;
-
-  const ara =
-    req.body.ara === true ||
-    internetGerekli(sonMesaj);
-
+  const ara = req.body.ara === true || internetGerekli(sonMesaj);
 
   // =====================================================
   // TAVILY İNTERNET ARAMASI
@@ -484,7 +462,6 @@ URL: ${kaynak.url || ""}
           text: "\n\nİnternet arama sonuçları:\n\n" + aramaMetni
         });
       }
-
     } catch (err) {
       console.error("Tavily hatası:", err);
 
@@ -494,23 +471,20 @@ URL: ${kaynak.url || ""}
     }
   }
 
-
   const ac = new AbortController();
 
   res.on("close", () => {
     if (!res.writableEnded) ac.abort();
   });
 
-
   // =====================================================
   // GEMINI MODEL İSTEĞİ
   // =====================================================
 
   try {
-    const modeller =
-      req.body.derin === true
-        ? [MODEL_GUCLU, MODEL]
-        : [MODEL];
+    const modeller = req.body.derin === true
+      ? [MODEL_GUCLU, MODEL]
+      : [MODEL];
 
     let r = null;
     let dusuldu = false;
@@ -540,12 +514,11 @@ URL: ${kaynak.url || ""}
       const d = await r.json().catch(() => ({}));
       const detay = (d.error?.message || "").slice(0, 300);
 
-      const msg =
-        r.status === 429
-          ? "Gemini API kotası doldu. " + detay
-          : r.status === 403
-            ? "Gemini API erişimini kontrol et. " + detay
-            : detay || "API hatası (" + r.status + ")";
+      const msg = r.status === 429
+        ? "Gemini API kotası doldu. " + detay
+        : r.status === 403
+          ? "Gemini API erişimini kontrol et. " + detay
+          : detay || "API hatası (" + r.status + ")";
 
       return res.status(502).json({ hata: msg });
     }
@@ -594,9 +567,7 @@ URL: ${kaynak.url || ""}
       });
     });
 
-    if (ara) {
-      sorgular.add(sonMesaj);
-    }
+    if (ara) sorgular.add(sonMesaj);
 
     function groundingIsle(meta) {
       if (!meta) return;
@@ -625,8 +596,7 @@ URL: ${kaynak.url || ""}
         meta.groundingSupports.forEach(destek => {
           kaynakDestekleri.push({
             metin: destek.segment?.text || "",
-            kaynakIndeksleri:
-              destek.groundingChunkIndices || []
+            kaynakIndeksleri: destek.groundingChunkIndices || []
           });
         });
       }
@@ -635,7 +605,6 @@ URL: ${kaynak.url || ""}
     try {
       while (true) {
         const { value, done } = await reader.read();
-
         if (done) break;
 
         buf += dec.decode(value, { stream: true });
@@ -651,7 +620,6 @@ URL: ${kaynak.url || ""}
             if (!satir.startsWith("data: ")) continue;
 
             const veri = satir.slice(6).trim();
-
             if (!veri || veri === "[DONE]") continue;
 
             let json;
@@ -663,14 +631,11 @@ URL: ${kaynak.url || ""}
             }
 
             if (json.promptFeedback?.blockReason) {
-              send({
-                hata: "İstek güvenlik nedeniyle engellendi."
-              });
+              send({ hata: "İstek güvenlik nedeniyle engellendi." });
               continue;
             }
 
             const aday = json.candidates?.[0];
-
             if (!aday) continue;
 
             const parcalar = aday.content?.parts || [];
@@ -696,13 +661,11 @@ URL: ${kaynak.url || ""}
           if (!satir.startsWith("data: ")) continue;
 
           const veri = satir.slice(6).trim();
-
           if (!veri || veri === "[DONE]") continue;
 
           try {
             const json = JSON.parse(veri);
             const aday = json.candidates?.[0];
-
             if (!aday) continue;
 
             const parcalar = aday.content?.parts || [];
@@ -734,19 +697,14 @@ URL: ${kaynak.url || ""}
       });
 
       res.end();
-
     } catch (err) {
       if (err.name !== "AbortError") {
         console.error("SSE Hatası:", err);
-
-        send({
-          hata: "Yanıt oluşturulurken bir hata oluştu."
-        });
+        send({ hata: "Yanıt oluşturulurken bir hata oluştu." });
       }
 
       if (!res.writableEnded) res.end();
     }
-
   } catch (err) {
     console.error("Chat API hatası:", err);
 
@@ -759,7 +717,6 @@ URL: ${kaynak.url || ""}
     if (!res.writableEnded) res.end();
   }
 });
-
 
 // =====================================================
 // GÖRSEL OLUŞTURMA VE DÜZENLEME
@@ -784,13 +741,9 @@ async function gorselIstemi(istem, signal, resim) {
 
   const model = resim ? CF_DUZEN_MODEL : CF_MODEL;
 
-  const inputs = {
-    prompt: istem
-  };
+  const inputs = { prompt: istem };
 
-  if (resim) {
-    inputs.image = resim;
-  }
+  if (resim) inputs.image = resim;
 
   const apiUrl =
     `https://api.cloudflare.com/client/v4/accounts/${CF_HESAP}/ai/run/${model}`;
@@ -817,10 +770,8 @@ async function gorselIstemi(istem, signal, resim) {
   }
 
   gorselSayac.adet++;
-
   return sonuc;
 }
-
 
 // =====================================================
 // GÖRSEL API
@@ -868,14 +819,8 @@ app.post("/api/gorsel", async (req, res) => {
       resim = eslesme[2];
     }
 
-    const sonuc = await gorselIstemi(
-      prompt,
-      undefined,
-      resim
-    );
-
+    const sonuc = await gorselIstemi(prompt, undefined, resim);
     res.json(sonuc);
-
   } catch (err) {
     console.error("Görsel oluşturma hatası:", err);
 
@@ -885,6 +830,91 @@ app.post("/api/gorsel", async (req, res) => {
   }
 });
 
+// =====================================================
+// ÖNERİ VE İSTEK E-POSTA API
+// =====================================================
+
+app.post("/api/oneriler", async (req, res) => {
+  try {
+    if (!mailer) {
+      return res.status(503).json({
+        hata: "E-posta sistemi henüz yapılandırılmadı."
+      });
+    }
+
+    const ip = req.headers["x-forwarded-for"] || req.ip;
+
+    if (!limitKontrol("oneri-" + ip, 5)) {
+      return res.status(429).json({
+        hata: "Çok fazla mesaj gönderdin. Biraz bekle."
+      });
+    }
+
+    const veri = req.body || {};
+
+    const ad = String(
+      veri.ad || veri.name || "Belirtilmedi"
+    ).trim().slice(0, 100);
+
+    const email = String(
+      veri.email || ""
+    ).trim().slice(0, 200);
+
+    const mesaj = String(
+      veri.mesaj || veri.message || veri.icerik || ""
+    ).trim().slice(0, 5000);
+
+    const konu = String(
+      veri.konu || veri.subject || "Öneri ve İstek"
+    ).trim().slice(0, 100);
+
+    if (!mesaj || mesaj.length < 3) {
+      return res.status(400).json({
+        hata: "Lütfen mesajını yaz."
+      });
+    }
+
+    if (
+      email &&
+      !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
+    ) {
+      return res.status(400).json({
+        hata: "E-posta adresi geçersiz."
+      });
+    }
+
+    await mailer.sendMail({
+      from: `"AbdulGPT" <${MAIL_USER}>`,
+      to: MAIL_TO,
+      replyTo: email || MAIL_USER,
+      subject: `AbdulGPT - ${konu}`,
+      text:
+`ABDULGPT ÖNERİ VE İSTEK BİLDİRİMİ
+
+Gönderen: ${ad}
+E-posta: ${email || "Belirtilmedi"}
+Konu: ${konu}
+
+MESAJ:
+
+${mesaj}
+
+Gönderim zamanı: ${turkiyeZamani()}
+`
+    });
+
+    return res.json({
+      ok: true,
+      mesaj: "Mesajın başarıyla gönderildi. Teşekkür ederiz!"
+    });
+  } catch (err) {
+    console.error("Öneri e-posta hatası:", err);
+
+    return res.status(500).json({
+      hata: "Mesaj gönderilemedi. Lütfen daha sonra tekrar dene."
+    });
+  }
+});
 
 // =====================================================
 // SUNUCUYU BAŞLAT
@@ -894,4 +924,5 @@ app.listen(PORT, () => {
   console.log(`AbdulGPT sunucusu ${PORT} portunda çalışıyor.`);
   console.log("Türkiye saati:", turkiyeZamani());
   console.log("Kurucu: Abdurrahim Çiftçi");
+  console.log("E-posta sistemi:", mailer ? "Hazır" : "Yapılandırılmadı");
 });
