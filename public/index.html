@@ -242,6 +242,20 @@ form:focus-within{box-shadow:0 12px 40px #0005,0 0 0 4px rgba(20,184,166,.25)}
 button.indir{background:none;font:inherit;font-size:.8rem;cursor:pointer}
 .indir+.indir{margin-left:8px}
 @media (prefers-reduced-motion:reduce){.gbek{animation:none}}
+
+/* ===== Öneri ve istek kutusu ===== */
+#geriBildirimAc{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;font:inherit;font-weight:600;color:var(--yazi);background:color-mix(in srgb,var(--a1) 12%,var(--panel));border:1px solid color-mix(in srgb,var(--a1) 45%,var(--cizgi));border-radius:12px;padding:10px;cursor:pointer}
+#geriBildirimAc:hover{border-color:var(--a1);background:color-mix(in srgb,var(--a1) 20%,var(--panel))}
+#geriBildirimDialog{width:min(480px,calc(100vw - 28px));max-height:90dvh;overflow:auto}
+#geriBildirimForm{display:block;width:100%;margin:0;padding:0;border:0;background:none;box-shadow:none;backdrop-filter:none}
+#geriBildirimDialog label{display:block;color:var(--soluk);font-size:.86rem;margin:10px 0 6px}
+#geriBildirimDialog select,#geriBildirimDialog textarea{width:100%;font:inherit;color:var(--yazi);background:var(--bg);border:1px solid var(--cizgi);border-radius:12px;padding:11px}
+#geriBildirimDialog textarea{min-height:130px;resize:vertical;max-height:35dvh}
+#geriBildirimDialog .gb-aksiyon{display:flex;justify-content:flex-end;gap:8px;margin-top:12px}
+#geriBildirimDialog .gb-gonder{font:inherit;font-weight:700;color:#fff;background:linear-gradient(135deg,#14b8a6,#2f7de1);border:0;border-radius:11px;padding:10px 16px;cursor:pointer}
+#geriBildirimDialog .gb-gonder:disabled{opacity:.55;cursor:wait}
+#geriBildirimDurum{min-height:1.3em;margin-top:8px;font-size:.86rem;color:var(--soluk)}
+
 </style>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
 <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
@@ -251,6 +265,7 @@ button.indir{background:none;font:inherit;font-size:.8rem;cursor:pointer}
 <aside id="yan">
   <div class="marka"><span class="lg" id="logo"></span><span id="ad"></span></div>
   <button class="yenib" id="yeni" type="button">+ Yeni sohbet</button>
+  <button id="geriBildirimAc" type="button">✉️ Öneri ve İstek Kutusu</button>
   <div id="liste2"></div>
   <div id="hesap" hidden></div>
 </aside>
@@ -299,6 +314,26 @@ button.indir{background:none;font:inherit;font-size:.8rem;cursor:pointer}
   <p>Asistan bunları hatırlar ve yeni öğrendiklerini buraya kendisi ekler. Her satır bir bilgi. Bu yazılar tarayıcında saklanır ve her mesajla yapay zekaya gönderilir; şifre ya da gizli bilgi yazma.</p>
   <textarea id="profil" rows="8" placeholder="Adım Ali&#10;8. sınıfa gidiyorum&#10;Futbolu severim"></textarea>
   <button class="ib" id="ayarkapat" type="button">Kaydet ve kapat</button>
+</dialog>
+
+<dialog id="geriBildirimDialog">
+  <h2>Öneri ve İstek Kutusu</h2>
+  <p>AbdulGPT'yi geliştirmemize yardımcı ol. Görüşün doğrudan proje ekibine iletilir.</p>
+  <form id="geriBildirimForm">
+    <label for="geriBildirimTur">Gönderi türü</label>
+    <select id="geriBildirimTur" required>
+      <option value="Öneri">Öneri</option>
+      <option value="İstek">İstek</option>
+      <option value="Hata bildirimi">Hata bildirimi</option>
+    </select>
+    <label for="geriBildirimMesaj">Mesajın</label>
+    <textarea id="geriBildirimMesaj" maxlength="3000" required placeholder="Önerini, isteğini veya karşılaştığın hatayı yaz..."></textarea>
+    <div id="geriBildirimDurum" role="status" aria-live="polite">Gönderdiğin mesaj ciftciabdurahim1@gmail.com adresine iletilir.</div>
+    <div class="gb-aksiyon">
+      <button class="ib" id="geriBildirimKapat" type="button">Vazgeç</button>
+      <button class="gb-gonder" id="geriBildirimGonder" type="submit">Gönder</button>
+    </div>
+  </form>
 </dialog>
 <script>
 // ---- Kendine göre değiştir ----
@@ -505,6 +540,41 @@ function profilEkle(bilgiler){
   if (!yeni.length) return;
   profilSet(satir.slice(-25).join("\n")); bildir("Hatırladım: " + yeni.join(", "));
 }
+
+// Öneri ve istek gönderimi (e-posta sunucu üzerinden gönderilir)
+$("geriBildirimAc").addEventListener("click", () => {
+  $("geriBildirimDurum").textContent = "Gönderdiğin mesaj ciftciabdurahim1@gmail.com adresine iletilir.";
+  $("geriBildirimDialog").showModal();
+  $("geriBildirimMesaj").focus();
+});
+$("geriBildirimKapat").addEventListener("click", () => $("geriBildirimDialog").close());
+$("geriBildirimForm").addEventListener("submit", async e => {
+  e.preventDefault();
+  const tur = $("geriBildirimTur").value;
+  const mesaj = $("geriBildirimMesaj").value.trim();
+  const gonder = $("geriBildirimGonder");
+  const durum = $("geriBildirimDurum");
+  if (!mesaj) { durum.textContent = "Lütfen mesajını yaz."; return; }
+  gonder.disabled = true; gonder.textContent = "Gönderiliyor…";
+  durum.textContent = "Mesajın iletiliyor…";
+  try {
+    const yanit = await fetch("/api/geri-bildirim", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ tur, mesaj })
+    });
+    const veri = await yanit.json().catch(() => ({}));
+    if (!yanit.ok || !veri.ok) throw new Error(veri.hata || "Mesaj gönderilemedi. Lütfen tekrar dene.");
+    durum.textContent = "Teşekkürler! Mesajın başarıyla iletildi.";
+    $("geriBildirimMesaj").value = "";
+    setTimeout(() => $("geriBildirimDialog").close(), 1400);
+  } catch (hata) {
+    durum.textContent = hata.message || "Bir bağlantı hatası oluştu.";
+  } finally {
+    gonder.disabled = false; gonder.textContent = "Gönder";
+  }
+});
+
 $("ayarb").addEventListener("click", () => { $("profil").value = profilGet(); $("tema").value = gor.tema; $("boyut").value = gor.boyut; $("ayar").showModal(); });
 $("ayarkapat").addEventListener("click", () => { profilSet($("profil").value.trim()); $("ayar").close(); });
 addEventListener("load", () => { if (cur().mod === "ders") cizHepsi(); });
