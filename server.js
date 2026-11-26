@@ -830,8 +830,24 @@ const image = body.image ?? body.kaynak;
       resim = eslesme[2];
     }
 
-    const sonuc = await gorselIstemi(prompt, undefined, resim);
-    res.json(sonuc);
+    const sonuc = await gorselIstemi(prompt.trim(), undefined, resim);
+
+const cikti = sonuc && sonuc.result ? sonuc.result : sonuc;
+const resimVerisi = cikti && (cikti.image || cikti.images?.[0]);
+
+if (typeof resimVerisi !== "string" || !resimVerisi.length) {
+  console.error("Cloudflare görsel yanıtı:", JSON.stringify(sonuc).slice(0, 1200));
+
+  return res.status(502).json({
+    hata: "Görsel servisi geçerli bir görsel döndürmedi."
+  });
+}
+
+const gorsel = resimVerisi.startsWith("data:image/")
+  ? resimVerisi
+  : "data:image/png;base64," + resimVerisi;
+
+res.json({ gorsel });
   } catch (err) {
     console.error("Görsel oluşturma hatası:", err);
 
