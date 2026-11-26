@@ -2,11 +2,20 @@
 const express = require("express");
 const crypto = require("crypto");
 const path = require("path");
+const net = require("net");
 
 const app = express();
+function istemciIp(req) {
+  const cfIp = req.headers["cf-connecting-ip"];
+
+  if (typeof cfIp === "string" && net.isIP(cfIp.trim())) {
+    return cfIp.trim();
+  }
+
+  return req.socket?.remoteAddress || "Bilinmiyor";
+}
 const adminPanel = require("./admin");
 
-app.set("trust proxy", 1);
 const PORT = process.env.PORT || 3000;
 
 const API_KEY = process.env.GEMINI_API_KEY;
@@ -225,7 +234,7 @@ app.get("/api/durum", (req, res) => {
 // =====================================================
 
 app.post("/api/giris", (req, res) => {
-  const k = "g" + (req.headers["x-forwarded-for"] || req.ip);
+  const k = "g" + istemciIp(req)
 
   if (!limitKontrol(k, 10)) {
     return res.status(429).json({
@@ -261,7 +270,7 @@ app.post("/api/chat", async (req, res) => {
     });
   }
 
-  const ip = req.headers["x-forwarded-for"] || req.ip;
+  const ip = istemciIp(req)
 
   if (!limitKontrol(ip, 10)) {
     return res.status(429).json({
@@ -838,7 +847,7 @@ app.post("/api/oneriler", async (req, res) => {
       });
     }
 
-    const ip = req.headers["x-forwarded-for"] || req.ip;
+    const ip = istemciIp(req)
 
     if (!limitKontrol("oneri-" + ip, 5)) {
       return res.status(429).json({
