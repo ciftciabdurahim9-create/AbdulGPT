@@ -4,6 +4,9 @@ const crypto = require("crypto");
 const path = require("path");
 
 const app = express();
+const adminPanel = require("./admin");
+
+app.set("trust proxy", 1);
 const PORT = process.env.PORT || 3000;
 
 const API_KEY = process.env.GEMINI_API_KEY;
@@ -150,6 +153,10 @@ const sifreTamam = g =>
   !SIFRE || crypto.timingSafeEqual(ozet(g || ""), ozet(SIFRE));
 
 app.use(express.json({ limit: "6mb" }));
+
+app.use(adminPanel.logMiddleware);
+app.use("/api/admin", adminPanel.router);
+
 app.use(express.static(path.join(__dirname, "public")));
 
 // =====================================================
