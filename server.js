@@ -32,7 +32,7 @@ const CF_HESAP = process.env.CLOUDFLARE_ACCOUNT_ID || "";
 const CF_TOKEN = process.env.CLOUDFLARE_API_TOKEN || "";
 
 const CF_MODEL = process.env.CF_GORSEL_MODEL || "@cf/black-forest-labs/flux-1-schnell";
-const CF_DUZEN_MODEL = process.env.CF_DUZEN_MODEL || "@cf/black-forest-labs/flux-1-kontext-pro";
+const CF_DUZEN_MODEL = process.env.CF_DUZEN_MODEL || "black-forest-labs/flux-1-kontext-pro";
 
 const GORSEL_GUNLUK = Number(process.env.GORSEL_GUNLUK) || 200;
 
