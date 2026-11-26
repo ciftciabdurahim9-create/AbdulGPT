@@ -1,0 +1,220 @@
+
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AbdulGPT Yönetici Paneli</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      padding: 20px;
+      background: #101b1b;
+      color: #e8eeee;
+      font-family: Arial, sans-serif;
+    }
+    main {
+      max-width: 1050px;
+      margin: 35px auto;
+    }
+    .card {
+      background: #192929;
+      border: 1px solid #31504c;
+      border-radius: 14px;
+      padding: 22px;
+      margin-bottom: 18px;
+    }
+    h1 { color: #14b8a6; }
+    input, button {
+      width: 100%;
+      padding: 13px;
+      margin-top: 10px;
+      border: 0;
+      border-radius: 8px;
+      font-size: 15px;
+    }
+    input { background: #e9f1ef; color: #111; }
+    button {
+      background: #14b8a6;
+      color: #062b28;
+      font-weight: bold;
+      cursor: pointer;
+    }
+    button.secondary {
+      background: #344b49;
+      color: white;
+    }
+    #panel { display: none; }
+    #durum { color: #e5b94e; }
+    .table-wrap { overflow-x: auto; }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      min-width: 650px;
+    }
+    th, td {
+      text-align: left;
+      padding: 12px;
+      border-bottom: 1px solid #31504c;
+      font-size: 13px;
+      overflow-wrap: anywhere;
+    }
+    th { color: #14b8a6; }
+    .muted { color: #a9bbbb; font-size: 13px; }
+  </style>
+</head>
+<body>
+<main>
+  <h1>AbdulGPT Yönetici Paneli</h1>
+
+  <section class="card" id="giris">
+    <h2>Yönetici girişi</h2>
+    <input id="password" type="password" placeholder="Yönetici şifresi">
+    <button id="login">Giriş yap</button>
+    <p id="durum"></p>
+  </section>
+
+  <section id="panel">
+    <div class="card">
+      <h2>Ziyaret kayıtları</h2>
+      <p class="muted">
+        En fazla 7 günlük kayıt gösterilir. Kayıtlar sunucu yeniden
+        başladığında silinebilir.
+      </p>
+      <p id="sayac">Kayıtlar yükleniyor...</p>
+      <button id="yenile">Kayıtları yenile</button>
+      <button class="secondary" id="cikis">Güvenli çıkış</button>
+    </div>
+
+    <div class="card table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>IP adresi</th>
+            <th>Tarih</th>
+            <th>Sayfa</th>
+            <th>Tarayıcı</th>
+          </tr>
+        </thead>
+        <tbody id="kayitlar"></tbody>
+      </table>
+    </div>
+  </section>
+</main>
+
+<script>
+let token = "";
+
+const $ = id => document.getElementById(id);
+
+function mesaj(text) {
+  $("durum").textContent = text;
+}
+
+async function api(path, options = {}) {
+  const headers = {
+    "Content-Type": "application/json",
+    ...(token ? { Authorization: "Bearer " + token } : {}),
+    ...(options.headers || {})
+  };
+
+  const response = await fetch("/api/admin" + path, {
+    ...options,
+    headers
+  });
+
+  const data = await response.json().catch(() => ({}));
+
+  if (!response.ok) {
+    if (response.status === 401) {
+      token = "";
+      $("panel").style.display = "none";
+      $("giris").style.display = "block";
+    }
+    throw new Error(data.hata || "İşlem başarısız.");
+  }
+
+  return data;
+}
+
+async function girisYap() {
+  const password = $("password").value;
+
+  if (!password) {
+    mesaj("Şifreni yaz.");
+    return;
+  }
+
+  $("login").disabled = true;
+
+  try {
+    const data = await api("/login", {
+      method: "POST",
+      body: JSON.stringify({ password })
+    });
+
+    token = data.token;
+    $("password").value = "";
+    $("giris").style.display = "none";
+    $("panel").style.display = "block";
+    mesaj("");
+    await kayitlariGetir();
+  } catch (error) {
+    mesaj(error.message);
+  } finally {
+    $("login").disabled = false;
+  }
+}
+
+async function kayitlariGetir() {
+  try {
+    const data = await api("/logs");
+    $("sayac").textContent = "Toplam kayıt: " + data.count;
+
+    const body = $("kayitlar");
+    body.replaceChildren();
+
+    for (const item of data.logs) {
+      const tr = document.createElement("tr");
+
+      const values = [
+        item.ip,
+        new Date(item.time).toLocaleString("tr-TR"),
+        item.page,
+        item.browser
+      ];
+
+      for (const value of values) {
+        const td = document.createElement("td");
+        td.textContent = value || "";
+        tr.appendChild(td);
+      }
+
+      body.appendChild(tr);
+    }
+  } catch (error) {
+    mesaj(error.message);
+  }
+}
+
+async function cikisYap() {
+  try {
+    await api("/logout", { method: "POST" });
+  } catch {}
+
+  token = "";
+  $("panel").style.display = "none";
+  $("giris").style.display = "block";
+  mesaj("Güvenli çıkış yapıldı.");
+}
+
+$("login").addEventListener("click", girisYap);
+$("password").addEventListener("keydown", e => {
+  if (e.key === "Enter") girisYap();
+});
+$("yenile").addEventListener("click", kayitlariGetir);
+$("cikis").addEventListener("click", cikisYap);
+</script>
+</body>
+</html>
