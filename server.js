@@ -752,7 +752,7 @@ async function gorselIstemi(istem, signal, resim) {
 
   const inputs = { prompt: istem };
 
-  if (resim) inputs.image = resim;
+  if (resim) inputs.input_image = resim;
 
   const apiUrl =
     `https://api.cloudflare.com/client/v4/accounts/${CF_HESAP}/ai/run/${model}`;
