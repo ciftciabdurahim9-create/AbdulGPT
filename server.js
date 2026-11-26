@@ -748,24 +748,31 @@ async function gorselIstemi(istem, signal, resim) {
     throw new Error("Günlük görsel oluşturma sınırına ulaşıldı.");
   }
 
-  const model = resim ? CF_DUZEN_MODEL : CF_MODEL;
+  
+const model = resim ? CF_DUZEN_MODEL : CF_MODEL;
 
-  const inputs = { prompt: istem };
+const inputs = { prompt: istem };
 
-  if (resim) inputs.input_image = resim;
+if (resim) inputs.input_image = resim;
 
-  const apiUrl =
-    `https://api.cloudflare.com/client/v4/accounts/${CF_HESAP}/ai/run/${model}`;
+const apiUrl = resim
+  ? `https://api.cloudflare.com/client/v4/accounts/${CF_HESAP}/ai/run`
+  : `https://api.cloudflare.com/client/v4/accounts/${CF_HESAP}/ai/run/${model}`;
 
-  const response = await fetch(apiUrl, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${CF_TOKEN}`,
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify(inputs),
-    signal
-  });
+const gonderilecekVeri = resim
+  ? { model, input: inputs }
+  : inputs;
+
+const response = await fetch(apiUrl, {
+  method: "POST",
+  headers: {
+    Authorization: `Bearer ${CF_TOKEN}`,
+    "Content-Type": "application/json"
+  },
+  body: JSON.stringify(gonderilecekVeri),
+  signal
+});
+  
 
   if (!response.ok) {
     const hata = await response.text();
