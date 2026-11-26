@@ -595,11 +595,11 @@ async function gorselUret(s, bub){
   const son = s.m[s.m.length - 1], istem = (son.content || "").trim(), duzen = !!son.img;
   bub.innerHTML = '<div class="gbek">' + (duzen ? "Görsel düzenleniyor…" : "Görsel hazırlanıyor…") + '</div>';
   try {
-    const govde = { istem };
+    const govde = { prompt: istem };
     if (duzen) {
       if (!istem) throw new Error("Ne değiştirmek istediğini yaz.");
       const k = await kucult(son.img, 500); // Düzenleme modeli küçük kaynak görsel ister
-      govde.kaynak = k.url; govde.en = k.en; govde.boy = k.boy;
+      govde.image = k.url; govde.en = k.en; govde.boy = k.boy;
     }
     const r = await fetch("/api/gorsel", { method: "POST", headers: { "Content-Type": "application/json", "x-sifre": encodeURIComponent(sifre) }, signal: ac.signal, body: JSON.stringify(govde) });
     if (r.status === 401) { sifre = ""; try { localStorage.removeItem("abdulgpt_sifre"); } catch {} girisAc("Şifre gerekli."); }
