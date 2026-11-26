@@ -6,10 +6,14 @@ const net = require("net");
 
 const app = express();
 function istemciIp(req) {
-  const cfIp = req.headers["cf-connecting-ip"];
+  const forwarded = req.headers["x-forwarded-for"];
 
-  if (typeof cfIp === "string" && net.isIP(cfIp.trim())) {
-    return cfIp.trim();
+  if (typeof forwarded === "string") {
+    const ip = forwarded.split(",")[0].trim();
+
+    if (net.isIP(ip)) {
+      return ip;
+    }
   }
 
   return req.socket?.remoteAddress || "Bilinmiyor";
