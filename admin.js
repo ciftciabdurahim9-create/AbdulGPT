@@ -1,8 +1,22 @@
 
 const express = require("express");
 const crypto = require("crypto");
+const net = require("net");
 
 const router = express.Router();
+function istemciIp(req) {
+  const forwarded = req.headers["x-forwarded-for"];
+
+  if (typeof forwarded === "string") {
+    const ip = forwarded.split(",")[0].trim();
+
+    if (net.isIP(ip)) {
+      return ip;
+    }
+  }
+
+  return req.socket?.remoteAddress || "Bilinmiyor";
+}
 
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "";
 const logs = [];
@@ -46,7 +60,7 @@ function logMiddleware(req, res, next) {
     (p === "/" || /\.html$/i.test(p))
   ) {
     logs.push({
-      ip: req.ip || "Bilinmiyor",
+      ip: istemciIp(req),
       time: Date.now(),
       page: p,
       browser: String(req.headers["user-agent"] || "Bilinmiyor").slice(0, 300)
@@ -81,7 +95,7 @@ router.post("/login", (req, res) => {
     });
   }
 
-  const ip = req.ip || "unknown";
+  const ip = istemciIp(req);
   const attempt = loginAttempts.get(ip) || {
     count: 0,
     until: Date.now() + 60_000
