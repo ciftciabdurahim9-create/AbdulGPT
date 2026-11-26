@@ -788,7 +788,9 @@ async function gorselIstemi(istem, signal, resim) {
 
 app.post("/api/gorsel", async (req, res) => {
   try {
-    const { prompt, image } = req.body || {};
+    const body = req.body || {};
+const prompt = body.prompt ?? body.istem;
+const image = body.image ?? body.kaynak;
 
     if (!prompt || typeof prompt !== "string") {
       return res.status(400).json({
